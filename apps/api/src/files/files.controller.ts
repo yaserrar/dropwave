@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { FilesService } from './files.service.js';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 
@@ -6,13 +13,15 @@ import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
-  @Get()
-  findAll() {
-    return this.filesService.findAll();
+  @Post('generate')
+  async generatePresignedUrl(
+    @Body() generateUploadUrlDto: GenerateUploadUrlDto,
+  ) {
+    return this.filesService.generatePresignedUrl(generateUploadUrlDto);
   }
 
-  @Post('generate')
-  generatePresignedUrl(@Body() generateUploadUrlDto: GenerateUploadUrlDto) {
-    return this.filesService.generatePresignedUrl(generateUploadUrlDto);
+  @Post(':id/confirm')
+  async confirmUpload(@Param('id', ParseUUIDPipe) fileId: string) {
+    return this.filesService.confirmUpload(fileId);
   }
 }

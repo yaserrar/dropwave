@@ -3,7 +3,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { randomUUID } from 'crypto';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 import { S3Service } from '../s3/s3.service.js';
-import { MAX_FILE_SIZE, S3_UPLOAD_EXPIRES_IN } from '../lib/consts.js';
+import {
+  MAX_FILE_SIZE,
+  S3_UPLOAD_EXPIRES_IN,
+  S3_DOWNLOAD_EXPIRES_IN,
+} from '../lib/consts.js';
 
 @Injectable()
 export class FilesService {
@@ -12,8 +16,14 @@ export class FilesService {
     private readonly prisma: PrismaService,
   ) {}
 
-  findAll() {
-    return `This action returns all files`;
+  async findAll() {
+    return this.prisma.file.findMany();
+  }
+
+  async findOne(fileId: string) {
+    return this.prisma.file.findUnique({
+      where: { id: fileId },
+    });
   }
 
   async generatePresignedUrl(generateUploadUrlDto: GenerateUploadUrlDto) {
@@ -50,5 +60,30 @@ export class FilesService {
     });
 
     return { uploadUrl: uploadUrl, file: file };
+  }
+
+  async confirmUpload(fileId: string) {
+    let file;
+    try {
+      file = await this.findOne(fileId);
+      if (!file) {
+        throw new HttpException('File not found', 404);
+      }
+    } catch (error) {
+      throw new HttpException('Error confirming upload', 500);
+    }
+
+    file = await this.prisma.file.update({
+      where: { id: fileId },
+      data: { status: 'UPLOADED' },
+    });
+
+    const presignedUrl = await this.s3Service.createDownloadUrl({
+      key: file.key,
+      filename: file.filename,
+      expiresIn: S3_DOWNLOAD_EXPIRES_IN,
+    });
+
+    return { file, downloadUrl: presignedUrl };
   }
 }
