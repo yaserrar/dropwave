@@ -8,12 +8,12 @@ Every push to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/dep
 The API container applies pending Prisma migrations before it starts.
 
 ```
-                   ┌──────────── EC2 ─────────────────────────────────────────┐
- dropwave.asrar  ──▶ Traefik :443 ──▶ /api/*  ──▶ api  (Nest, :4000) ─┐       │
- .software          (Let's Encrypt)  ──▶ /*   ──▶ web  (Next, :3000)   │       │
-                   │                                                  ▼       │
-                   │           "proxy" network ─────────────────▶ postgres    │
-                   └──────────────────────────────────────────────────────────┘
+                                ┌──────────── EC2 ──────────────────────────────────────┐
+ dropwave.asrar  ─▶ Cloudflare ─▶ Traefik :443 ─▶ /api/* ─▶ api  (Nest :4000) ─┐       │
+ .software          (proxied)     (Let's Encrypt,  ─▶ /*  ─▶ web  (Next :3000)  │ data  │
+                                │  DNS challenge)            "proxy" network    ▼       │
+                                │                                          postgres     │
+                                └───────────────────────────────────────────────────────┘
  Browser uploads and downloads go straight to S3 with presigned URLs.
 ```
 
@@ -28,16 +28,17 @@ Everything below is one-time setup.
   sudo usermod -aG docker $USER   # log out and back in
   ```
 
-## 2. DNS
+## 2. DNS (Cloudflare)
 
-In the DNS for `asrar.software`, add **A** records pointing at the Elastic IP:
+In Cloudflare's DNS for `asrar.software`, add **A** records, **Proxied** (orange cloud), pointing at the Elastic IP:
 
 | Name | Value |
 |---|---|
 | `dropwave` | Elastic IP |
-| `pgadmin` | Elastic IP |
+| `pgadmin-ec2` | Elastic IP |
 
-Traefik requests certificates on first visit, so DNS must already resolve to the server.
+- Keep every name **one level** under `asrar.software`. Cloudflare's free edge certificate only covers `*.asrar.software`, so a name like `ec2.pgadmin.asrar.software` gets a ⚠ in the dashboard and a certificate error in browsers.
+- **SSL/TLS mode: Full (strict).** Traefik serves a real Let's Encrypt certificate, obtained through the Cloudflare DNS challenge, so Cloudflare can verify the origin.
 
 ## 3. S3 access from EC2 (IAM role, no keys on the server)
 
@@ -72,27 +73,29 @@ Add the production origin to the bucket's CORS rule (**S3 → dropwave → Permi
 
 ## 5. Infra stack: Traefik, Postgres, pgAdmin
 
-This stack isn't in the repo; it lives in its own folder on the server (`~/infra`). Dropwave only needs it to:
+This stack isn't pushed. It lives in its own folder on the server (`~/infra`) and follows the same layout as the main server's devops stack. Dropwave relies on these names from it:
 
-- create a Docker network named **`proxy`**;
-- run Traefik on it with an entrypoint named **`websecure`** (443) and a certificate resolver named **`letsencrypt`**;
-- run Postgres on it with the container name **`postgres`**.
+| Name | What it is |
+|---|---|
+| `proxy` network | Traefik reaches the app containers here |
+| `data` network | Postgres lives here, as the container `postgres` |
+| `websecure` | Traefik's HTTPS (443) entrypoint |
+| `letsencryptresolver` | Certificate resolver, using the Cloudflare DNS challenge |
+| `secure-headers@docker` | Shared security-headers middleware |
 
-If your Traefik setup uses other names, change the labels in [`docker-compose.yml`](docker-compose.yml) to match. Then:
-
-```sh
-cd ~/infra && docker compose up -d
-```
-
-Create the Dropwave database and its own user:
+Copy the folder to the server, fill in `.env` (from `.env.example`), then:
 
 ```sh
-docker exec -it postgres psql -U postgres \
-  -c "CREATE USER dropwave WITH PASSWORD 'a-long-random-password';" \
-  -c "CREATE DATABASE dropwave OWNER dropwave;"
+cd ~/infra
+touch acme.json && chmod 600 acme.json   # Traefik refuses a world-readable cert store
+docker compose up -d
 ```
 
-pgAdmin is then at `https://pgadmin.asrar.software`. Register a server with host `postgres`, port `5432`.
+`CF_DNS_API_TOKEN` is a Cloudflare token for the `asrar.software` zone with **Zone/Read + DNS/Edit**. The main server's token works too.
+
+On first start, `postgres/init/01-databases.sh` creates the `dropwave` role and database using `DROPWAVE_DB_PASSWORD`. It only runs on an empty volume. For apps added later, create the role and database by hand, or add them to the script before the first start.
+
+pgAdmin is then at `https://pgadmin-ec2.asrar.software`, with this server's Postgres already registered.
 
 ## 6. App folder
 
@@ -103,7 +106,7 @@ mkdir -p ~/apps/dropwave && cd ~/apps/dropwave
 Create two files there, from [`.env.example`](.env.example) and [`.env.api.example`](.env.api.example):
 
 - **`.env`** holds `DOMAIN`, `IMAGE_OWNER` and `IMAGE_TAG`. Docker Compose reads it to fill in `docker-compose.yml`.
-- **`.env.api`** holds `DATABASE_URL` (with the password from step 5), `AWS_REGION` and `S3_BUCKET`. It's passed to the API container.
+- **`.env.api`** holds `DATABASE_URL` (with `DROPWAVE_DB_PASSWORD` from step 5), `AWS_REGION` and `S3_BUCKET`. It's passed to the API container.
 
 `docker-compose.yml` arrives with the first deploy.
 

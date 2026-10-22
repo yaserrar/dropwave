@@ -1,13 +1,18 @@
 # Dropwave app stack. Lives in ~/apps/dropwave on the server; the deploy
 # workflow copies this file there and restarts with the new image tag.
-# Needs the server's infra stack running: it provides Traefik, Postgres and
-# the "proxy" network (see DEPLOY.md).
+# Needs the server's infra stack running: it provides Traefik (on the `proxy`
+# network) and Postgres (on the `data` network). See DEPLOY.md.
 name: dropwave
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
 
 services:
   api:
     image: ghcr.io/${IMAGE_OWNER}/dropwave-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    logging: *logging
     env_file: .env.api
     environment:
       NODE_ENV: production
@@ -17,25 +22,29 @@ services:
       # Longer rule = higher priority, so /api wins over the web router below.
       - traefik.http.routers.dropwave-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
       - traefik.http.routers.dropwave-api.entrypoints=websecure
-      - traefik.http.routers.dropwave-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.dropwave-api.tls.certresolver=letsencryptresolver
+      - traefik.http.routers.dropwave-api.middlewares=secure-headers@docker
       - traefik.http.services.dropwave-api.loadbalancer.server.port=4000
-    networks:
-      - proxy
+    # proxy: reached by Traefik. data: reaches Postgres as postgres:5432.
+    networks: [proxy, data]
 
   web:
     image: ghcr.io/${IMAGE_OWNER}/dropwave-web:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    logging: *logging
     depends_on:
       - api
     labels:
       - traefik.enable=true
       - traefik.http.routers.dropwave-web.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.dropwave-web.entrypoints=websecure
-      - traefik.http.routers.dropwave-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.dropwave-web.tls.certresolver=letsencryptresolver
+      - traefik.http.routers.dropwave-web.middlewares=secure-headers@docker
       - traefik.http.services.dropwave-web.loadbalancer.server.port=3000
-    networks:
-      - proxy
+    networks: [proxy]
 
 networks:
   proxy:
+    external: true
+  data:
     external: true
