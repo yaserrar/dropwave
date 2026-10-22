@@ -1,16 +1,20 @@
-import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  GoneException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { randomUUID } from 'crypto';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 import { S3Service } from '../s3/s3.service.js';
-import {
-  MAX_FILE_SIZE,
-  S3_UPLOAD_EXPIRES_IN,
-  S3_DOWNLOAD_EXPIRES_IN,
-} from '../lib/consts.js';
+import { S3_UPLOAD_EXPIRES_IN, S3_DOWNLOAD_EXPIRES_IN } from '../lib/consts.js';
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
@@ -26,12 +30,11 @@ export class FilesService {
     });
   }
 
+  // Size and type limits are enforced by GenerateUploadUrlDto before this runs.
   async generatePresignedUrl(generateUploadUrlDto: GenerateUploadUrlDto) {
-    if (generateUploadUrlDto.size > MAX_FILE_SIZE) {
-      throw new HttpException('File size exceeds the maximum limit', 400);
-    }
-
-    const fileKey = this.s3Service.buildFileKey(randomUUID());
+    // One id for both the row and the S3 key keeps them easy to match up.
+    const fileId = randomUUID();
+    const fileKey = this.s3Service.buildFileKey(fileId);
 
     const uploadUrl = await this.s3Service.createUploadUrl({
       key: fileKey,
@@ -39,27 +42,29 @@ export class FilesService {
       expiresIn: S3_UPLOAD_EXPIRES_IN,
     });
 
-    console.log(`Generated presigned URL for file key: ${uploadUrl}`);
-
-    const file = await this.prisma.file.create({
+    await this.prisma.file.create({
       data: {
+        id: fileId,
         key: fileKey,
         filename: generateUploadUrlDto.filename,
         contentType: generateUploadUrlDto.contentType,
         size: generateUploadUrlDto.size,
         status: 'PENDING',
       },
-      select: {
-        id: true,
-        key: true,
-        filename: true,
-        contentType: true,
-        size: true,
-        status: true,
-      },
     });
 
-    return { uploadUrl: uploadUrl, file: file };
+    // Don't log the URL itself: anyone holding it can upload until it expires.
+    this.logger.log(`Generated upload URL for file ${fileId}`);
+
+    return { fileId, uploadUrl };
+  }
+
+  async getFileInfo(fileId: string) {
+    const file = await this.findOne(fileId);
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+    return file;
   }
 
   async confirmUpload(fileId: string) {
@@ -68,23 +73,53 @@ export class FilesService {
       throw new NotFoundException('File not found');
     }
 
-    // check file exist in bucket
-    const fileExists = await this.s3Service.checkFileExists(existingFile.key);
-    if (!fileExists) {
-      throw new NotFoundException('File does not exist in S3 bucket');
+    // Safe to call again, e.g. if the client retries after a network error.
+    if (existingFile.status === 'UPLOADED') {
+      return { fileId };
     }
 
-    const newFile = await this.prisma.file.update({
+    const object = await this.s3Service.getObjectInfo(existingFile.key);
+    if (!object) {
+      throw new BadRequestException('File has not been uploaded yet');
+    }
+
+    // The presigned URL can't limit size, so this is where the declared size
+    // (already checked against MAX_FILE_SIZE by the DTO) is actually enforced.
+    if (object.size !== existingFile.size) {
+      await this.s3Service.deleteObject(existingFile.key);
+      throw new BadRequestException('Uploaded file size does not match');
+    }
+
+    await this.prisma.file.update({
       where: { id: fileId },
       data: { status: 'UPLOADED' },
     });
 
-    const presignedUrl = await this.s3Service.createDownloadUrl({
-      key: newFile.key,
-      filename: newFile.filename,
+    return { fileId };
+  }
+
+  async getDownloadUrl(fileId: string) {
+    const file = await this.findOne(fileId);
+
+    // A PENDING file looks missing, so half-finished uploads can't be downloaded.
+    if (!file || file.status !== 'UPLOADED') {
+      throw new NotFoundException('File not found');
+    }
+    if (file.expiresAt && file.expiresAt < new Date()) {
+      throw new GoneException('This link has expired');
+    }
+
+    const url = await this.s3Service.createDownloadUrl({
+      key: file.key,
+      filename: file.filename,
       expiresIn: S3_DOWNLOAD_EXPIRES_IN,
     });
 
-    return { file: newFile, downloadUrl: presignedUrl };
+    await this.prisma.file.update({
+      where: { id: fileId },
+      data: { downloadCount: { increment: 1 } },
+    });
+
+    return url;
   }
 }

@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   ParseUUIDPipe,
+  Redirect,
 } from '@nestjs/common';
 import { FilesService } from './files.service.js';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
@@ -20,8 +21,20 @@ export class FilesController {
     return this.filesService.generatePresignedUrl(generateUploadUrlDto);
   }
 
+  @Get(':id')
+  async getFileInfo(@Param('id', ParseUUIDPipe) fileId: string) {
+    return this.filesService.getFileInfo(fileId);
+  }
+
   @Post(':id/confirm')
   async confirmUpload(@Param('id', ParseUUIDPipe) fileId: string) {
     return this.filesService.confirmUpload(fileId);
+  }
+
+  // Redirects to a short-lived S3 URL, so a plain <a href> to this route downloads the file.
+  @Get(':id/download')
+  @Redirect()
+  async download(@Param('id', ParseUUIDPipe) fileId: string) {
+    return { url: await this.filesService.getDownloadUrl(fileId) };
   }
 }
