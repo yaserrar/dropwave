@@ -9,49 +9,20 @@ import { formatBytes } from "@/lib/format";
 import { Dropzone } from "./dropzone";
 import { FileRow, type UploadItem } from "./file-row";
 
-const TICK_MS = 100;
-
-// Simulated for now: progress advances on a timer and the share link is made up.
-// Replace with the real flow (POST /api/files/generate → PUT to S3 → confirm).
 function createItem(file: File): UploadItem {
-  const id = crypto.randomUUID();
-  const base = {
-    id,
-    file,
-    percent: 0,
-    shareUrl: `${window.location.origin}/s/${id}`,
-  };
+  const base = { id: crypto.randomUUID(), file, percent: 0, shareUrl: "" };
 
   if (file.size > MAX_FILE_SIZE) {
     return {
       ...base,
       status: "error",
-      speed: 0,
       error: `Larger than ${formatBytes(MAX_FILE_SIZE, 0)}`,
     };
   }
   if (file.size === 0) {
-    return { ...base, status: "error", speed: 0, error: "This file is empty" };
+    return { ...base, status: "error", error: "This file is empty" };
   }
-  // 1.5–4.5 MB/s, so a 10 MB file takes a few seconds.
-  return {
-    ...base,
-    status: "uploading",
-    speed: (1.5 + Math.random() * 3) * 1024 * 1024,
-  };
-}
-
-function tick(item: UploadItem): UploadItem {
-  if (item.status !== "uploading") return item;
-  // At least 4% per tick so tiny files still show a short, visible upload.
-  const step = Math.max(
-    4,
-    ((item.speed * TICK_MS) / 1000 / item.file.size) * 100,
-  );
-  const percent = Math.min(100, item.percent + step);
-  return percent >= 100
-    ? { ...item, percent: 100, status: "done" }
-    : { ...item, percent };
+  return { ...base, status: "uploading" };
 }
 
 export function Uploader() {
