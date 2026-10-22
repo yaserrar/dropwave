@@ -8,6 +8,9 @@ import { MAX_FILE_SIZE } from "@/lib/consts";
 import { formatBytes } from "@/lib/format";
 import { Dropzone } from "./dropzone";
 import { FileRow, type UploadItem } from "./file-row";
+import { errorMessage } from "@/lib/utils";
+import { useUploadFile } from "@/hooks/files";
+import axios from "axios";
 
 function createItem(file: File): UploadItem {
   const base = { id: crypto.randomUUID(), file, percent: 0, shareUrl: "" };
@@ -27,24 +30,69 @@ function createItem(file: File): UploadItem {
 
 export function Uploader() {
   const [items, setItems] = React.useState<UploadItem[]>([]);
-  const uploading = items.some((i) => i.status === "uploading");
+  const { mutateAsync: uploadFile } = useUploadFile();
+  // One AbortController per upload in progress, so Remove / Clear all can cancel it.
+  const controllers = React.useRef(new Map<string, AbortController>());
 
-  React.useEffect(() => {
-    if (!uploading) return;
-    const timer = setInterval(
-      () => setItems((prev) => prev.map(tick)),
-      TICK_MS,
-    );
-    return () => clearInterval(timer);
-  }, [uploading]);
-
-  const addFiles = React.useCallback((files: File[]) => {
-    // Newest first, so fresh drops appear right under the zone.
-    setItems((prev) => [...files.map(createItem).reverse(), ...prev]);
+  const update = React.useCallback((id: string, patch: Partial<UploadItem>) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   }, []);
 
-  const remove = (id: string) =>
+  const startUpload = React.useCallback(
+    (item: UploadItem) => {
+      const controller = new AbortController();
+      controllers.current.set(item.id, controller);
+
+      uploadFile({
+        file: item.file,
+        signal: controller.signal,
+        // Hold at 99% until confirm succeeds, so 100% means "really done".
+        onProgress: (percent) =>
+          update(item.id, { percent: Math.min(percent, 99) }),
+      })
+        .then(({ fileId }) =>
+          update(item.id, {
+            status: "done",
+            percent: 100,
+            shareUrl: `${window.location.origin}/s/${fileId}`,
+          }),
+        )
+        .catch((error) => {
+          if (axios.isCancel(error)) return; // removed by the user, not a failure
+          update(item.id, {
+            status: "error",
+            error: String(errorMessage(error)),
+          });
+        })
+        .finally(() => controllers.current.delete(item.id));
+    },
+    [uploadFile, update],
+  );
+
+  const addFiles = React.useCallback(
+    (files: File[]) => {
+      const newItems = files.map(createItem).reverse();
+      setItems((prev) => [...newItems, ...prev]);
+      newItems.filter((i) => i.status === "uploading").forEach(startUpload);
+    },
+    [startUpload],
+  );
+
+  const remove = (id: string) => {
+    controllers.current.get(id)?.abort();
     setItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const clearAll = () => {
+    controllers.current.forEach((c) => c.abort());
+    setItems([]);
+  };
+
+  // Cancel uploads still running if the user leaves the page.
+  React.useEffect(() => {
+    const map = controllers.current;
+    return () => map.forEach((c) => c.abort());
+  }, []);
 
   const ready = items.filter((i) => i.status === "done").length;
 
@@ -81,7 +129,7 @@ export function Uploader() {
                 variant="ghost"
                 size="xs"
                 className="text-muted-foreground"
-                onClick={() => setItems([])}
+                onClick={clearAll}
               >
                 Clear all
               </Button>

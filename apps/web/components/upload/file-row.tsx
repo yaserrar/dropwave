@@ -30,8 +30,6 @@ export type UploadItem = {
   file: File;
   status: "uploading" | "done" | "error";
   percent: number;
-  /** Simulated throughput in bytes per second (fixed per item so ticks stay pure). */
-  speed: number;
   shareUrl: string;
   error?: string;
 };
