@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { FilesService } from './files.service.js';
-import { GeneratePresignedUrlDto } from './dto/generate-presigned-url.dto.js';
+import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 
 @Controller('files')
 export class FilesController {
@@ -12,9 +12,7 @@ export class FilesController {
   }
 
   @Post('generate')
-  generatePresignedUrl(
-    @Body() generatePresignedUrlDto: GeneratePresignedUrlDto,
-  ) {
-    return this.filesService.generatePresignedUrl(generatePresignedUrlDto);
+  generatePresignedUrl(@Body() generateUploadUrlDto: GenerateUploadUrlDto) {
+    return this.filesService.generatePresignedUrl(generateUploadUrlDto);
   }
 }

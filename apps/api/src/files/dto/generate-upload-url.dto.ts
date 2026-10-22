@@ -10,7 +10,7 @@ import {
 
 export const MAX_FILE_SIZE = 1024 * 1024 * 20; // 20 MB
 
-export class GeneratePresignedUrlDto {
+export class GenerateUploadUrlDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

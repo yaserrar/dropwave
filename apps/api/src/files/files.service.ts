@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GeneratePresignedUrlDto } from './dto/generate-presigned-url.dto.js';
+import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 
 @Injectable()
 export class FilesService {
@@ -7,7 +7,7 @@ export class FilesService {
     return `This action returns all files`;
   }
 
-  generatePresignedUrl(generatePresignedUrlDto: GeneratePresignedUrlDto) {
-    return { ...generatePresignedUrlDto };
+  generatePresignedUrl(generateUploadUrlDto: GenerateUploadUrlDto) {
+    return { ...generateUploadUrlDto };
   }
 }
