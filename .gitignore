@@ -29,7 +29,7 @@ coverage
 out/
 build
 dist
-
+.env.prod.api
 
 # Debug
 npm-debug.log*
