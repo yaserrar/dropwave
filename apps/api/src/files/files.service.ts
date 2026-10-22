@@ -8,7 +8,6 @@ export class FilesService {
   }
 
   generatePresignedUrl(generatePresignedUrlDto: GeneratePresignedUrlDto) {
-    console.log(generatePresignedUrlDto);
-    return generatePresignedUrlDto;
+    return { ...generatePresignedUrlDto };
   }
 }
