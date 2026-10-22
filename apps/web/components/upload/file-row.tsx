@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CloseCircle, Copy, CopySuccess, Link21, TickCircle, Warning2 } from "iconsax-react";
+import { CloseCircle, Copy, CopySuccess, ExportSquare, Link21, TickCircle, Warning2 } from "iconsax-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -159,9 +159,25 @@ function ShareLink({ url }: { url: string }) {
   return (
     <div className="mt-3 flex items-center gap-2 rounded-lg border bg-surface py-1 pr-1 pl-2.5">
       <Link21 className="size-4 shrink-0 text-brand-muted" color="currentColor" />
-      <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground select-all">
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Open the share page in a new tab"
+        className="min-w-0 flex-1 truncate rounded-sm font-mono text-xs text-muted-foreground underline-offset-4 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
         {url.replace(/^https?:\/\//, "")}
-      </span>
+      </a>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button asChild variant="ghost" size="icon-sm" className="text-muted-foreground">
+            <a href={url} target="_blank" rel="noopener noreferrer" aria-label="Open share page in a new tab">
+              <ExportSquare className="size-4" color="currentColor" />
+            </a>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Open in new tab</TooltipContent>
+      </Tooltip>
       <Button type="button" size="sm" variant={copied ? "secondary" : "default"} onClick={copy} className="min-w-24">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span

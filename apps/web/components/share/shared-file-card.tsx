@@ -10,6 +10,7 @@ import { iconForFile } from "@/lib/file-icons";
 import { fileTypeLabel, formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FileInfo } from "@/types/file";
+import { FilePreviewDialog } from "./file-preview-dialog";
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -52,7 +53,7 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
           <motion.h1
             variants={rise}
             title={file.filename}
-            className="mt-3 line-clamp-2 font-heading text-2xl leading-tight font-medium tracking-tight break-all sm:text-[28px]"
+            className="mt-3 line-clamp-2 font-heading text-2xl leading-tight font-medium tracking-tight wrap-break-word sm:text-[28px]"
           >
             {file.filename}
           </motion.h1>
@@ -81,6 +82,7 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
 
           <motion.div variants={rise} className="mt-8 flex w-full gap-2">
             <DownloadButton href={downloadUrl} />
+            <FilePreviewDialog file={file} downloadUrl={downloadUrl} />
             <CopyLinkButton />
           </motion.div>
         </motion.div>
@@ -102,7 +104,7 @@ function FileTile({ icon: FileIcon }: { icon: ReturnType<typeof iconForFile> }) 
         <motion.span
           key={i}
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[22px] border border-brand/40"
+          className="pointer-events-none absolute inset-0 rounded-3xl border border-brand/40"
           animate={{ scale: [1, 1.9], opacity: [0.5, 0] }}
           transition={{ duration: 3, repeat: Infinity, delay: i * 1.5, ease: "easeOut" }}
         />
@@ -111,7 +113,7 @@ function FileTile({ icon: FileIcon }: { icon: ReturnType<typeof iconForFile> }) 
       <motion.div
         animate={{ y: [0, -4, 0] }}
         transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
-        className="relative flex size-20 items-center justify-center rounded-[22px] border bg-card text-brand-muted shadow-lg"
+        className="relative flex size-20 items-center justify-center rounded-3xl border bg-card text-brand-muted shadow-lg"
       >
         <FileIcon variant="Bulk" className="size-10" color="currentColor" />
       </motion.div>
@@ -209,7 +211,7 @@ export function SharedFileSkeleton() {
       aria-label="Loading file"
     >
       <div className="flex flex-col items-center rounded-[13px] border bg-card px-6 pt-10 pb-6 sm:px-10">
-        <div className="size-20 animate-pulse rounded-[22px] bg-muted" />
+        <div className="size-20 animate-pulse rounded-3xl bg-muted" />
         <div className="mt-6 h-5 w-28 animate-pulse rounded-full bg-muted" />
         <div className="mt-4 h-7 w-3/4 animate-pulse rounded-md bg-muted" />
         <div className="mt-3 h-4 w-1/2 animate-pulse rounded-md bg-muted" />

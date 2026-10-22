@@ -55,17 +55,25 @@ export class S3Service {
   }
 
   /**
-   * Presigned GET URL that makes the browser download the file under its original name.
+   * Presigned GET URL. `attachment` (default) makes the browser download the file under
+   * its original name; `inline` lets it display the file, e.g. in an <img> or <iframe>.
    */
   createDownloadUrl(params: {
     key: string;
     filename: string;
     expiresIn?: number;
+    disposition?: 'attachment' | 'inline';
+    /** Overrides the stored Content-Type, e.g. to force a charset for text previews. */
+    contentType?: string;
   }): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: params.key,
-      ResponseContentDisposition: contentDisposition(params.filename),
+      ResponseContentDisposition: contentDisposition(
+        params.filename,
+        params.disposition ?? 'attachment',
+      ),
+      ResponseContentType: params.contentType,
     });
     return getSignedUrl(this.client, command, {
       expiresIn: params.expiresIn ?? 5 * 60,
@@ -113,9 +121,12 @@ export class S3Service {
 
 // `filename` is the ASCII fallback for old clients; `filename*` carries the real
 // UTF-8 name so names like "résumé.pdf" survive the download.
-function contentDisposition(filename: string): string {
+function contentDisposition(
+  filename: string,
+  disposition: 'attachment' | 'inline',
+): string {
   const fallback = filename
     .replace(/[^\x20-\x7e]/g, '_')
     .replace(/["\\]/g, '_');
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }

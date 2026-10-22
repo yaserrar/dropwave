@@ -10,6 +10,8 @@ export type UploadArgs = {
 export type GenerateResponse = { fileId: string; uploadUrl: string };
 export type ConfirmResponse = { fileId: string };
 
+export type PreviewResponse = { kind: "image" | "pdf" | "text"; url: string };
+
 export type FileInfo = {
   id: string;
   filename: string;

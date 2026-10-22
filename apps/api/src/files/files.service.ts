@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 import { S3Service } from '../s3/s3.service.js';
 import { S3_UPLOAD_EXPIRES_IN, S3_DOWNLOAD_EXPIRES_IN } from '../lib/consts.js';
+import { previewKind } from '../lib/preview.js';
 
 @Injectable()
 export class FilesService {
@@ -28,6 +29,20 @@ export class FilesService {
     return this.prisma.file.findUnique({
       where: { id: fileId },
     });
+  }
+
+  /** The file behind a share link, if it can be downloaded right now. */
+  private async findAvailable(fileId: string) {
+    const file = await this.findOne(fileId);
+
+    // A PENDING file looks missing, so half-finished uploads can't be downloaded.
+    if (!file || file.status !== 'UPLOADED') {
+      throw new NotFoundException('File not found');
+    }
+    if (file.expiresAt && file.expiresAt < new Date()) {
+      throw new GoneException('This link has expired');
+    }
+    return file;
   }
 
   // Size and type limits are enforced by GenerateUploadUrlDto before this runs.
@@ -59,12 +74,12 @@ export class FilesService {
     return { fileId, uploadUrl };
   }
 
+  // Public: anyone with the link calls this, so only expose what the share page shows.
   async getFileInfo(fileId: string) {
-    const file = await this.findOne(fileId);
-    if (!file) {
-      throw new NotFoundException('File not found');
-    }
-    return file;
+    const file = await this.findAvailable(fileId);
+
+    const { status: _status, ...info } = file;
+    return info;
   }
 
   async confirmUpload(fileId: string) {
@@ -98,16 +113,31 @@ export class FilesService {
     return { fileId };
   }
 
-  async getDownloadUrl(fileId: string) {
-    const file = await this.findOne(fileId);
+  // Returns the URL as JSON (not a redirect) so the browser can fetch text
+  // straight from S3; following a redirect would turn its CORS origin into "null".
+  async getPreviewUrl(fileId: string) {
+    const file = await this.findAvailable(fileId);
 
-    // A PENDING file looks missing, so half-finished uploads can't be downloaded.
-    if (!file || file.status !== 'UPLOADED') {
-      throw new NotFoundException('File not found');
+    const kind = previewKind(file.contentType);
+    if (!kind) {
+      throw new BadRequestException('This file type cannot be previewed');
     }
-    if (file.expiresAt && file.expiresAt < new Date()) {
-      throw new GoneException('This link has expired');
-    }
+
+    const url = await this.s3Service.createDownloadUrl({
+      key: file.key,
+      filename: file.filename,
+      expiresIn: S3_DOWNLOAD_EXPIRES_IN,
+      disposition: 'inline',
+      // Text is rendered by our page, never by the browser, so serve it as plain UTF-8.
+      contentType:
+        kind === 'text' ? 'text/plain; charset=utf-8' : file.contentType,
+    });
+
+    return { kind, url };
+  }
+
+  async getDownloadUrl(fileId: string) {
+    const file = await this.findAvailable(fileId);
 
     const url = await this.s3Service.createDownloadUrl({
       key: file.key,

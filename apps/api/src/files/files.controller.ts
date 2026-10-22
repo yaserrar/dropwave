@@ -31,6 +31,12 @@ export class FilesController {
     return this.filesService.confirmUpload(fileId);
   }
 
+  // Images, PDFs and text only: a short-lived S3 URL that displays the file instead of downloading it.
+  @Get(':id/preview')
+  async preview(@Param('id', ParseUUIDPipe) fileId: string) {
+    return this.filesService.getPreviewUrl(fileId);
+  }
+
   // Redirects to a short-lived S3 URL, so a plain <a href> to this route downloads the file.
   @Get(':id/download')
   @Redirect()

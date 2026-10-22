@@ -1,3 +1,4 @@
+import { qk } from "@/lib/query-keys";
 import { errorMessage } from "@/lib/utils";
 import filesService from "@/services/files";
 import { UploadArgs } from "@/types/file";
@@ -30,8 +31,34 @@ export const useUploadFile = () =>
     },
   });
 
+// Only fetched while the preview dialog is open. The URL is valid for an hour,
+// so cache it a bit less than that and reopening the dialog is instant.
+export const useGetPreview = (fileId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: [...qk.files.byId(fileId), "preview"],
+    queryFn: () => filesService.getPreview(fileId),
+    enabled,
+    staleTime: 50 * 60 * 1000,
+    retry: false,
+  });
+
+export const useGetPreviewText = (url: string | undefined) =>
+  useQuery({
+    queryKey: ["preview-text", url],
+    queryFn: () => filesService.getText(url!),
+    enabled: !!url,
+    staleTime: Infinity,
+    retry: false,
+  });
+
 export const useGetFileInfo = (fileId: string) =>
   useQuery({
-    queryKey: ["fileInfo", fileId],
+    queryKey: qk.files.byId(fileId),
     queryFn: () => filesService.getFileInfo(fileId),
+    // A 4xx (wrong link, expired) won't change on retry; only retry server/network errors.
+    retry: (failureCount, error) => {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (status && status < 500) return false;
+      return failureCount < 1;
+    },
   });

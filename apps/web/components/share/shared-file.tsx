@@ -1,9 +1,8 @@
 "use client";
 
-import * as React from "react";
-import axios, { AxiosError, type AxiosResponse } from "axios";
+import axios from "axios";
 import { AnimatePresence } from "motion/react";
-import type { FileInfo } from "@/types/file";
+import { useGetFileInfo } from "@/hooks/files";
 import { SharedFileCard, SharedFileSkeleton } from "./shared-file-card";
 import { SharedFileUnavailable, type UnavailableReason } from "./shared-file-unavailable";
 
@@ -18,8 +17,7 @@ function reasonFor(error: unknown): UnavailableReason {
 }
 
 export function SharedFile({ id }: { id: string }) {
-  // TODO: replace with your hook, e.g. `const { data, isPending, error, refetch } = useFileInfo(id);`
-  const { data, isPending, error, refetch } = usePreviewFileInfo(id);
+  const { data, isPending, error, refetch } = useGetFileInfo(id);
 
   // The API redirects this URL to a short-lived S3 download link.
   const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL}/files/${id}/download`;
@@ -35,43 +33,4 @@ export function SharedFile({ id }: { id: string }) {
       )}
     </AnimatePresence>
   );
-}
-
-// ─── Preview data — delete everything below once your hook is in place ─────
-// Add ?preview=missing | expired | error to the URL to see the other states.
-
-function usePreviewFileInfo(id: string) {
-  const [state, setState] = React.useState<{ data?: FileInfo; error?: unknown; isPending: boolean }>({ isPending: true });
-  const [attempt, setAttempt] = React.useState(0);
-
-  React.useEffect(() => {
-    const preview = new URLSearchParams(window.location.search).get("preview");
-    const timer = setTimeout(() => {
-      const status = { missing: 404, expired: 410, error: 500 }[preview ?? ""];
-      if (status) {
-        const response = { status } as AxiosResponse;
-        setState({ isPending: false, error: new AxiosError("Preview error", undefined, undefined, undefined, response) });
-      } else {
-        setState({
-          isPending: false,
-          data: {
-            id,
-            filename: "Q3 product report.pdf",
-            contentType: "application/pdf",
-            size: 2_480_000,
-            createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-            expiresAt: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
-          },
-        });
-      }
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [id, attempt]);
-
-  const refetch = () => {
-    setState({ isPending: true });
-    setAttempt((n) => n + 1);
-  };
-
-  return { ...state, refetch };
 }
