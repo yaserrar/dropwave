@@ -1,0 +1,41 @@
+# Dropwave app stack. Lives in ~/apps/dropwave on the server; the deploy
+# workflow copies this file there and restarts with the new image tag.
+# Needs the server's infra stack running: it provides Traefik, Postgres and
+# the "proxy" network (see DEPLOY.md).
+name: dropwave
+
+services:
+  api:
+    image: ghcr.io/${IMAGE_OWNER}/dropwave-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env.api
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+    labels:
+      - traefik.enable=true
+      # Longer rule = higher priority, so /api wins over the web router below.
+      - traefik.http.routers.dropwave-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.dropwave-api.entrypoints=websecure
+      - traefik.http.routers.dropwave-api.tls.certresolver=letsencrypt
+      - traefik.http.services.dropwave-api.loadbalancer.server.port=4000
+    networks:
+      - proxy
+
+  web:
+    image: ghcr.io/${IMAGE_OWNER}/dropwave-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - api
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dropwave-web.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.dropwave-web.entrypoints=websecure
+      - traefik.http.routers.dropwave-web.tls.certresolver=letsencrypt
+      - traefik.http.services.dropwave-web.loadbalancer.server.port=3000
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
