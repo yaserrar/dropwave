@@ -67,7 +67,7 @@ jobs:
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
 
       - name: Upload compose file
-        run: scp -i ~/.ssh/deploy_key docker-compose.yml "$EC2_USER@$EC2_HOST:~/apps/dropwave/docker-compose.yml"
+        run: scp -i ~/.ssh/deploy_key docker-compose.yml "$EC2_USER@$EC2_HOST:~/dropwave/docker-compose.yml"
 
       # The registry token only lives for this job, so log in, pull, and log out again.
       - name: Pull and restart
@@ -76,7 +76,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" bash -s <<EOF
           set -euo pipefail
-          cd ~/apps/dropwave
+          cd ~/dropwave
           sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${GITHUB_SHA}/" .env
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
           docker compose pull
