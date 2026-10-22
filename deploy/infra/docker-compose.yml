@@ -2,6 +2,7 @@
 # one reverse proxy and one Postgres.
 #
 #   traefik   HTTPS for every app (Let's Encrypt via Cloudflare DNS challenge)
+#             https://${TRAEFIK_HOST}  (dashboard, basic auth)
 #   pgadmin   https://${PGADMIN_HOST}
 #   postgres  postgres:5432 on the `data` network (and 127.0.0.1:5432 on the host)
 #
@@ -44,6 +45,7 @@ services:
       - --providers.docker=true
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=proxy
+      - --api.dashboard=true
       - --accesslog=true
       - --log.level=INFO
       - --ping=true
@@ -58,9 +60,16 @@ services:
       timeout: 5s
       retries: 3
     labels:
-      # No dashboard router here (no DNS record for it); the labels only define
-      # the shared middleware. Apps reference it as `secure-headers@docker`.
+      # The dashboard router also stops Traefik from inventing a default router
+      # (Host(`traefik2-infra`)) for this container, which has no valid certificate.
       - traefik.enable=true
+      - traefik.http.routers.traefik.rule=Host(`${TRAEFIK_HOST:?set TRAEFIK_HOST in .env}`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.tls.certresolver=letsencryptresolver
+      - traefik.http.routers.traefik.service=api@internal
+      - traefik.http.routers.traefik.middlewares=dashboard-auth,secure-headers
+      - traefik.http.middlewares.dashboard-auth.basicauth.users=${DASHBOARD_AUTH:?set DASHBOARD_AUTH in .env}
+      # Shared middleware: apps reference it as `secure-headers@docker`.
       - traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000
       - traefik.http.middlewares.secure-headers.headers.stsIncludeSubdomains=true
       - traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true

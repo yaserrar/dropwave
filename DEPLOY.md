@@ -32,9 +32,9 @@ Everything below is one-time setup.
 
 In Cloudflare's DNS for `asrar.software`, add **A** records, **Proxied** (orange cloud), pointing at the Elastic IP:
 
-| Name | Value |
-|---|---|
-| `dropwave` | Elastic IP |
+| Name          | Value      |
+| ------------- | ---------- |
+| `dropwave`    | Elastic IP |
 | `pgadmin-ec2` | Elastic IP |
 
 - Keep every name **one level** under `asrar.software`. Cloudflare's free edge certificate only covers `*.asrar.software`, so a name like `ec2.pgadmin.asrar.software` gets a ⚠ in the dashboard and a certificate error in browsers.
@@ -46,11 +46,13 @@ In Cloudflare's DNS for `asrar.software`, add **A** records, **Proxied** (orange
    ```json
    {
      "Version": "2012-10-17",
-     "Statement": [{
-       "Effect": "Allow",
-       "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
-       "Resource": "arn:aws:s3:::dropwave/uploads/*"
-     }]
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+         "Resource": "arn:aws:s3:::dropwave/uploads/*"
+       }
+     ]
    }
    ```
 2. **EC2 → your instance → Actions → Security → Modify IAM role** and pick the role.
@@ -75,13 +77,13 @@ Add the production origin to the bucket's CORS rule (**S3 → dropwave → Permi
 
 This stack isn't pushed. It lives in its own folder on the server (`~/infra`) and follows the same layout as the main server's devops stack. Dropwave relies on these names from it:
 
-| Name | What it is |
-|---|---|
-| `proxy` network | Traefik reaches the app containers here |
-| `data` network | Postgres lives here, as the container `postgres` |
-| `websecure` | Traefik's HTTPS (443) entrypoint |
-| `letsencryptresolver` | Certificate resolver, using the Cloudflare DNS challenge |
-| `secure-headers@file` | Shared security-headers middleware |
+| Name                    | What it is                                               |
+| ----------------------- | -------------------------------------------------------- |
+| `proxy` network         | Traefik reaches the app containers here                  |
+| `data` network          | Postgres lives here, as the container `postgres`         |
+| `websecure`             | Traefik's HTTPS (443) entrypoint                         |
+| `letsencryptresolver`   | Certificate resolver, using the Cloudflare DNS challenge |
+| `secure-headers@docker` | Shared security-headers middleware                       |
 
 Copy the folder to the server, fill in `.env` (from `.env.example`), then:
 
@@ -92,6 +94,8 @@ docker compose up -d
 ```
 
 `CF_DNS_API_TOKEN` is a Cloudflare token for the `asrar.software` zone with **Zone/Read + DNS/Edit**. The main server's token works too.
+
+The Traefik dashboard is served at `TRAEFIK_HOST` (e.g. `traefik2.asrar.software`) behind basic auth (`DASHBOARD_AUTH`, from `htpasswd -nB admin`, single-quoted in `.env`). Its certificate comes through the DNS challenge, so no DNS record is needed unless you want to open it. It also gives the Traefik container a real router, which stops Traefik from inventing one it can't get a certificate for.
 
 On first start, `postgres/init/01-databases.sh` creates the `dropwave` role and database using `DROPWAVE_DB_PASSWORD`. It only runs on an empty volume. For apps added later, create the role and database by hand, or add them to the script before the first start.
 
@@ -119,10 +123,10 @@ Create two files there, from [`.env.example`](.env.example) and [`.env.api.examp
    Append `dropwave_deploy.pub` to `~/.ssh/authorized_keys` on the server.
 2. **Add the secrets.** In **repo → Settings → Secrets and variables → Actions**:
 
-   | Secret | Value |
-   |---|---|
-   | `EC2_HOST` | Elastic IP or hostname |
-   | `EC2_USER` | `ubuntu` (or your user) |
+   | Secret        | Value                                         |
+   | ------------- | --------------------------------------------- |
+   | `EC2_HOST`    | Elastic IP or hostname                        |
+   | `EC2_USER`    | `ubuntu` (or your user)                       |
    | `EC2_SSH_KEY` | contents of the private key `dropwave_deploy` |
 
 3. Push to `main`, or run the workflow from the **Actions** tab.
