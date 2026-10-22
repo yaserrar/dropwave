@@ -12,5 +12,26 @@ datasource db {
   provider = "postgresql"
 }
 
+enum FileStatus {
+  PENDING 
+  UPLOADED 
+  EXPIRED
+  DELETED
+}
 
+model File {
+  id            String     @id @default(uuid()) // also the public share id in links
+  key           String     @unique // S3 object key
+  filename      String // original name, used for Content-Disposition on download
+  contentType   String
+  size          BigInt // bytes; BigInt so files over 2 GB fit
+  status        FileStatus @default(PENDING)
+  downloadCount Int        @default(0)
+  expiresAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
+  @@index([status, createdAt]) // find stale PENDING uploads to clean up
+  @@index([expiresAt]) // find expired files to delete
+  @@map("files")
+}

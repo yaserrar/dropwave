@@ -9,7 +9,7 @@ import { FilesModule } from './files/files.module.js';
     }),
     FilesModule,
   ],
-  controllers: [],
+  controllers: [FilesModule],
   providers: [],
 })
 export class AppModule {}
