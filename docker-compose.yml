@@ -23,7 +23,7 @@ services:
       - traefik.http.routers.dropwave-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
       - traefik.http.routers.dropwave-api.entrypoints=websecure
       - traefik.http.routers.dropwave-api.tls.certresolver=letsencryptresolver
-      - traefik.http.routers.dropwave-api.middlewares=secure-headers@docker
+      - traefik.http.routers.dropwave-api.middlewares=secure-headers@file
       - traefik.http.services.dropwave-api.loadbalancer.server.port=4000
     # proxy: reached by Traefik. data: reaches Postgres as postgres:5432.
     networks: [proxy, data]
@@ -39,7 +39,7 @@ services:
       - traefik.http.routers.dropwave-web.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.dropwave-web.entrypoints=websecure
       - traefik.http.routers.dropwave-web.tls.certresolver=letsencryptresolver
-      - traefik.http.routers.dropwave-web.middlewares=secure-headers@docker
+      - traefik.http.routers.dropwave-web.middlewares=secure-headers@file
       - traefik.http.services.dropwave-web.loadbalancer.server.port=3000
     networks: [proxy]
 

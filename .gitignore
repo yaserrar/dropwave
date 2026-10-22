@@ -30,7 +30,6 @@ out/
 build
 dist
 
-infra/
 
 # Debug
 npm-debug.log*

@@ -1,0 +1,146 @@
+# EC2 shared infrastructure, same layout as the main server's devops stack:
+# one reverse proxy and one Postgres.
+#
+#   traefik   HTTPS for every app (Let's Encrypt via Cloudflare DNS challenge)
+#   pgadmin   https://${PGADMIN_HOST}
+#   postgres  postgres:5432 on the `data` network (and 127.0.0.1:5432 on the host)
+#
+# Apps (dropwave, ...) live in their own compose files and join the external
+# `proxy` network (for Traefik) and `data` network (for Postgres). Both networks
+# are created by this file, so start it first:
+#
+#   touch acme.json && chmod 600 acme.json   # once, before the first start
+#   docker compose up -d
+
+name: ec2-infra
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+services:
+  traefik:
+    image: traefik:v3.6.1
+    container_name: traefik
+    restart: unless-stopped
+    logging: *logging
+    ports: ["80:80", "443:443"]
+    networks: [proxy]
+    environment:
+      # Lets Traefik create the _acme-challenge TXT record in Cloudflare. A custom
+      # token limited to the asrar.software zone: Zone/Read + DNS/Edit.
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?set CF_DNS_API_TOKEN in .env}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme.json:/acme.json
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=letsencryptresolver
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=proxy
+      - --accesslog=true
+      - --log.level=INFO
+      - --ping=true
+      - --certificatesresolvers.letsencryptresolver.acme.email=${EMAIL:?set EMAIL in .env}
+      - --certificatesresolvers.letsencryptresolver.acme.storage=/acme.json
+      # DNS challenge: the HTTP/TLS challenges can't reach Traefik behind Cloudflare's proxy.
+      - --certificatesresolvers.letsencryptresolver.acme.dnschallenge=true
+      - --certificatesresolvers.letsencryptresolver.acme.dnschallenge.provider=cloudflare
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      # No dashboard router here (no DNS record for it); the labels only define
+      # the shared middleware. Apps reference it as `secure-headers@docker`.
+      - traefik.enable=true
+      - traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.secure-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.secure-headers.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.secure-headers.headers.referrerPolicy=strict-origin-when-cross-origin
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres
+    restart: unless-stopped
+    logging: *logging
+    shm_size: 256mb
+    networks: [data]
+    # Host-only (SSH tunnels, backups). Never expose it publicly.
+    ports: ["${POSTGRES_BIND:-127.0.0.1}:5432:5432"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      # Used once by ./postgres/init (first start on an empty volume).
+      DROPWAVE_DB_PASSWORD: ${DROPWAVE_DB_PASSWORD:?set DROPWAVE_DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    container_name: pgadmin
+    restart: unless-stopped
+    logging: *logging
+    networks: [proxy, data]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:?set PGADMIN_EMAIL in .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?set PGADMIN_PASSWORD in .env}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "True"
+      PGADMIN_DISABLE_POSTFIX: "true"
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pgadmin.rule=Host(`${PGADMIN_HOST:?set PGADMIN_HOST in .env}`)
+      - traefik.http.routers.pgadmin.entrypoints=websecure
+      - traefik.http.routers.pgadmin.tls.certresolver=letsencryptresolver
+      - traefik.http.routers.pgadmin.middlewares=secure-headers
+      - traefik.http.services.pgadmin.loadbalancer.server.port=80
+
+  # Nightly logical backups of every database, kept BACKUP_KEEP_DAYS on the host.
+  postgres-backup:
+    image: postgres:17-alpine
+    container_name: postgres-backup
+    restart: unless-stopped
+    logging: *logging
+    networks: [data]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./backups:/backups
+      - ./postgres/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "/backup.sh"]
+
+networks:
+  proxy:
+    name: proxy
+  data:
+    name: data
+
+volumes:
+  postgres-data:
+  pgadmin-data:

@@ -81,7 +81,7 @@ This stack isn't pushed. It lives in its own folder on the server (`~/infra`) an
 | `data` network | Postgres lives here, as the container `postgres` |
 | `websecure` | Traefik's HTTPS (443) entrypoint |
 | `letsencryptresolver` | Certificate resolver, using the Cloudflare DNS challenge |
-| `secure-headers@docker` | Shared security-headers middleware |
+| `secure-headers@file` | Shared security-headers middleware |
 
 Copy the folder to the server, fill in `.env` (from `.env.example`), then:
 
