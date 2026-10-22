@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { randomUUID } from 'crypto';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
@@ -63,27 +63,28 @@ export class FilesService {
   }
 
   async confirmUpload(fileId: string) {
-    let file;
-    try {
-      file = await this.findOne(fileId);
-      if (!file) {
-        throw new HttpException('File not found', 404);
-      }
-    } catch (error) {
-      throw new HttpException('Error confirming upload', 500);
+    const existingFile = await this.findOne(fileId);
+    if (!existingFile) {
+      throw new NotFoundException('File not found');
     }
 
-    file = await this.prisma.file.update({
+    // check file exist in bucket
+    const fileExists = await this.s3Service.checkFileExists(existingFile.key);
+    if (!fileExists) {
+      throw new NotFoundException('File does not exist in S3 bucket');
+    }
+
+    const newFile = await this.prisma.file.update({
       where: { id: fileId },
       data: { status: 'UPLOADED' },
     });
 
     const presignedUrl = await this.s3Service.createDownloadUrl({
-      key: file.key,
-      filename: file.filename,
+      key: newFile.key,
+      filename: newFile.filename,
       expiresIn: S3_DOWNLOAD_EXPIRES_IN,
     });
 
-    return { file, downloadUrl: presignedUrl };
+    return { file: newFile, downloadUrl: presignedUrl };
   }
 }

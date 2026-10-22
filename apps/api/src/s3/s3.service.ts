@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   NotFound,
   PutObjectCommand,
@@ -93,6 +94,20 @@ export class S3Service {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
+  }
+
+  async checkFileExists(key: string): Promise<boolean> {
+    const info = await this.getObjectInfo(key);
+    return info !== null;
+  }
+
+  async checkBucketExists(): Promise<boolean> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 }
 
