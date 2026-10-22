@@ -1,18 +1,3 @@
-// export type FileStatus = "PENDING" | "UPLOADING" | "DONE" | "ERROR";
-
-// export type File = {
-//   id: string;
-//   key: string;
-//   filename: string;
-//   contentType: string;
-//   size: number;
-//   status: FileStatus;
-//   downloadCount: number;
-//   expiresAt?: Date;
-//   createdAt: Date;
-//   updatedAt: Date;
-// };
-
 //------------------------------------------------
 export type UploadArgs = {
   file: File;
@@ -24,3 +9,12 @@ export type UploadArgs = {
 
 export type GenerateResponse = { fileId: string; uploadUrl: string };
 export type ConfirmResponse = { fileId: string };
+
+export type FileInfo = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  createdAt: string;
+  expiresAt: string | null;
+};

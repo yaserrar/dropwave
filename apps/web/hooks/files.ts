@@ -1,7 +1,7 @@
 import { errorMessage } from "@/lib/utils";
 import filesService from "@/services/files";
 import { UploadArgs } from "@/types/file";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -28,4 +28,10 @@ export const useUploadFile = () =>
       if (axios.isCancel(error)) return;
       toast.error(errorMessage(error));
     },
+  });
+
+export const useGetFileInfo = (fileId: string) =>
+  useQuery({
+    queryKey: ["fileInfo", fileId],
+    queryFn: () => filesService.getFileInfo(fileId),
   });

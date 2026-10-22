@@ -2,26 +2,12 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  Archive,
-  CloseCircle,
-  Copy,
-  CopySuccess,
-  Document,
-  DocumentCode,
-  DocumentText,
-  Gallery,
-  Link21,
-  Music,
-  TickCircle,
-  VideoPlay,
-  Warning2,
-  type Icon,
-} from "iconsax-react";
+import { CloseCircle, Copy, CopySuccess, Link21, TickCircle, Warning2 } from "iconsax-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { iconForFile } from "@/lib/file-icons";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -34,20 +20,8 @@ export type UploadItem = {
   error?: string;
 };
 
-function iconFor(file: File): Icon {
-  const type = file.type;
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  if (type.startsWith("image/")) return Gallery;
-  if (type.startsWith("video/")) return VideoPlay;
-  if (type.startsWith("audio/")) return Music;
-  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return Archive;
-  if (["js", "ts", "tsx", "json", "html", "css", "py", "go", "rs", "sh"].includes(ext)) return DocumentCode;
-  if (type.startsWith("text/") || ["pdf", "doc", "docx", "md", "txt", "rtf"].includes(ext)) return DocumentText;
-  return Document;
-}
-
 export function FileRow({ item, onRemove }: { item: UploadItem; onRemove: () => void }) {
-  const FileIcon = iconFor(item.file);
+  const FileIcon = iconForFile(item.file.name, item.file.type);
   const loaded = Math.round((item.file.size * item.percent) / 100);
 
   return (

@@ -1,7 +1,7 @@
 import type { GenerateSchema } from "@/schemas/files";
 import axios from "@/lib/axios";
 import axiosBase from "axios";
-import { GenerateResponse, ConfirmResponse } from "@/types/file";
+import { GenerateResponse, ConfirmResponse, FileInfo } from "@/types/file";
 
 const filesService = {
   generate: async (data: GenerateSchema) => {
@@ -28,6 +28,14 @@ const filesService = {
   },
   confirm: async (id: string) => {
     return (await axios.post(`/files/${id}/confirm`)).data as ConfirmResponse;
+  },
+
+  getFileInfo: async (id: string) => {
+    return (await axios.get(`/files/${id}`)).data as FileInfo;
+  },
+  download: async (id: string) => {
+    return (await axios.get(`/files/${id}/download`, { responseType: "blob" }))
+      .data as Blob;
   },
 };
 
