@@ -7,8 +7,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-
-export const MAX_FILE_SIZE = 1024 * 1024 * 20; // 20 MB
+import { MAX_FILE_SIZE } from '../../lib/consts.js';
 
 export class GenerateUploadUrlDto {
   @IsString()
