@@ -4,10 +4,11 @@ import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { DocumentUpload } from "iconsax-react";
 import { formatBytes } from "@/lib/format";
-import { MAX_FILE_SIZE } from "@/lib/constants";
+import { MAX_FILE_SIZE } from "@/lib/consts";
 import { cn } from "@/lib/utils";
 
-const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes("Files") ?? false;
+const hasFiles = (e: DragEvent) =>
+  e.dataTransfer?.types.includes("Files") ?? false;
 
 /**
  * Drop target for the whole page: files dropped (or pasted) anywhere are
@@ -98,7 +99,10 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
           dragging && "border-gradient-animated shadow-lg",
         )}
       >
-        <div aria-hidden className="bg-dot-grid mask-radial pointer-events-none absolute inset-0 opacity-70" />
+        <div
+          aria-hidden
+          className="bg-dot-grid mask-radial pointer-events-none absolute inset-0 opacity-70"
+        />
         <div
           aria-hidden
           className={cn(
@@ -146,7 +150,9 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
                     <span className="font-heading text-lg font-medium tracking-tight text-brand-muted">
                       Release to drop your files
                     </span>
-                    <span className="text-sm text-muted-foreground">Anywhere on the page works</span>
+                    <span className="text-sm text-muted-foreground">
+                      Anywhere on the page works
+                    </span>
                   </>
                 ) : (
                   <>
@@ -154,7 +160,10 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
                       Drop files here
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      or <span className="font-medium text-foreground underline decoration-brand-border underline-offset-4 transition-colors group-hover:decoration-brand-muted">browse your computer</span>
+                      or{" "}
+                      <span className="font-medium text-foreground underline decoration-brand-border underline-offset-4 transition-colors group-hover:decoration-brand-muted">
+                        browse your computer
+                      </span>
                     </span>
                   </>
                 )}
@@ -162,14 +171,25 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
             </AnimatePresence>
           </div>
 
-          <p id={hintId} className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <p
+            id={hintId}
+            className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          >
             <span>Any file type</span>
-            <span aria-hidden className="size-1 rounded-full bg-border-strong" />
+            <span
+              aria-hidden
+              className="size-1 rounded-full bg-border-strong"
+            />
             <span>Up to {formatBytes(MAX_FILE_SIZE, 0)} each</span>
-            <span aria-hidden className="size-1 rounded-full bg-border-strong max-sm:hidden" />
+            <span
+              aria-hidden
+              className="size-1 rounded-full bg-border-strong max-sm:hidden"
+            />
             <span className="max-sm:hidden">
               Paste with{" "}
-              <kbd className="rounded-sm border bg-muted px-1 py-px font-mono text-2xs text-foreground">⌘V</kbd>
+              <kbd className="rounded-sm border bg-muted px-1 py-px font-mono text-2xs text-foreground">
+                ⌘V
+              </kbd>
             </span>
           </p>
         </button>
@@ -205,7 +225,12 @@ function IconTile({ dragging, burst }: { dragging: boolean; burst: number }) {
               initial={{ scale: 1, opacity: 0 }}
               animate={{ scale: [1, 3.2], opacity: [0.7, 0] }}
               exit={{ opacity: 0, transition: { duration: 0.2 } }}
-              transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.8, ease: "easeOut" }}
+              transition={{
+                duration: 2.4,
+                repeat: Infinity,
+                delay: i * 0.8,
+                ease: "easeOut",
+              }}
             />
           ))}
       </AnimatePresence>
@@ -226,18 +251,32 @@ function IconTile({ dragging, burst }: { dragging: boolean; burst: number }) {
       </AnimatePresence>
 
       <motion.div
-        animate={dragging ? { y: -10, scale: 1.1, rotate: -6 } : { y: [0, -5, 0], scale: 1, rotate: 0 }}
+        animate={
+          dragging
+            ? { y: -10, scale: 1.1, rotate: -6 }
+            : { y: [0, -5, 0], scale: 1, rotate: 0 }
+        }
         transition={
           dragging
             ? { type: "spring", stiffness: 320, damping: 18 }
-            : { y: { duration: 3.2, repeat: Infinity, ease: "easeInOut" }, scale: { duration: 0.3 }, rotate: { duration: 0.3 } }
+            : {
+                y: { duration: 3.2, repeat: Infinity, ease: "easeInOut" },
+                scale: { duration: 0.3 },
+                rotate: { duration: 0.3 },
+              }
         }
         className={cn(
           "relative flex size-16 items-center justify-center rounded-2xl border bg-card shadow-md transition-colors duration-300",
-          dragging ? "border-brand-border text-brand-muted" : "text-muted-foreground group-hover:text-brand-muted",
+          dragging
+            ? "border-brand-border text-brand-muted"
+            : "text-muted-foreground group-hover:text-brand-muted",
         )}
       >
-        <DocumentUpload variant="Bulk" className="size-8" color="currentColor" />
+        <DocumentUpload
+          variant="Bulk"
+          className="size-8"
+          color="currentColor"
+        />
       </motion.div>
     </div>
   );

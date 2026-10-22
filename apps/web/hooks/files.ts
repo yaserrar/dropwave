@@ -15,3 +15,15 @@ export const useGenerate = () => {
     },
   });
 };
+
+export const useConfirm = () => {
+  return useMutation({
+    mutationFn: (id: string) => filesService.confirm(id),
+    onSuccess: () => {
+      toast.success("File confirmed successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to confirm file: ${errorMessage(error)}`);
+    },
+  });
+};

@@ -34,3 +34,9 @@ export const generateSchema = z.object({
 });
 
 export type GenerateSchema = z.infer<typeof generateSchema>;
+
+export const confirmSchema = z.object({
+  id: z.string().min(1).max(255),
+});
+
+export type ConfirmSchema = z.infer<typeof confirmSchema>;
