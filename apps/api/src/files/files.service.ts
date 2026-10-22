@@ -39,6 +39,14 @@ export class FilesService {
         size: generateUploadUrlDto.size,
         status: 'PENDING',
       },
+      select: {
+        id: true,
+        key: true,
+        filename: true,
+        contentType: true,
+        size: true,
+        status: true,
+      },
     });
 
     return { uploadUrl: uploadUrl, file: file };
