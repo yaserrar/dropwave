@@ -3,7 +3,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { minutes, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { FilesModule } from './files/files.module.js';
+import { loggerParams } from './lib/logger.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { S3Module } from './s3/s3.module.js';
 import { TasksModule } from './tasks/tasks.module.js';
@@ -13,6 +15,7 @@ import { TasksModule } from './tasks/tasks.module.js';
     ConfigModule.forRoot({
       envFilePath: '.env',
     }),
+    LoggerModule.forRoot(loggerParams),
     FilesModule,
     S3Module,
     PrismaModule,

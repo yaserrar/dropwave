@@ -101,10 +101,12 @@ On first start, `postgres/init/01-databases.sh` creates the `dropwave` role and 
 
 pgAdmin is then at `https://pgadmin-ec2.asrar.software`, with this server's Postgres already registered.
 
+Logs for every container (the apps included) are at `DOZZLE_HOST` (e.g. `https://logs2.asrar.software`). It uses the same basic-auth login as the Traefik dashboard and needs its own proxied A record. The API writes one JSON object per line (pino), which Dozzle shows as fields: filter by `level`, `req.url`, `res.statusCode` or a `req.id` taken from a response's `x-request-id` header.
+
 ## 6. App folder
 
 ```sh
-mkdir -p ~/apps/dropwave && cd ~/apps/dropwave
+mkdir -p ~/dropwave && cd ~/dropwave
 ```
 
 Create two files there, from [`.env.example`](.env.example) and [`.env.api.example`](.env.api.example):
@@ -136,10 +138,10 @@ The images are private on GHCR. Each deploy logs the server in with that run's s
 ## Day to day
 
 ```sh
-cd ~/apps/dropwave
+cd ~/dropwave
 docker compose ps
 docker compose logs -f api        # migrations + requests
 docker compose logs -f web
 ```
 
-**Roll back:** set `IMAGE_TAG` in `~/apps/dropwave/.env` to an earlier commit SHA, then run `docker compose up -d`. Since the packages are private, run `docker login ghcr.io` first with a personal access token that has `read:packages`.
+**Roll back:** set `IMAGE_TAG` in `~/dropwave/.env` to an earlier commit SHA, then run `docker compose up -d`. Since the packages are private, run `docker login ghcr.io` first with a personal access token that has `read:packages`.

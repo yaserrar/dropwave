@@ -4,6 +4,7 @@
 #   traefik   HTTPS for every app (Let's Encrypt via Cloudflare DNS challenge)
 #             https://${TRAEFIK_HOST}  (dashboard, basic auth)
 #   pgadmin   https://${PGADMIN_HOST}
+#   dozzle    https://${DOZZLE_HOST}   (live logs of every container, basic auth)
 #   postgres  postgres:5432 on the `data` network (and 127.0.0.1:5432 on the host)
 #
 # Apps (dropwave, ...) live in their own compose files and join the external
@@ -143,6 +144,31 @@ services:
       - ./backups:/backups
       - ./postgres/backup.sh:/backup.sh:ro
     entrypoint: ["/bin/sh", "/backup.sh"]
+
+  # Web UI for the logs of every container on this server (apps included). It
+  # reads Docker's own log files, so what it can show is bounded by each
+  # service's log rotation (10 MB x 3 here). The Docker socket can control
+  # every container, so keep it read-only and behind the dashboard login.
+  dozzle:
+    image: amir20/dozzle:v11.3.0
+    container_name: dozzle
+    restart: unless-stopped
+    logging: *logging
+    networks: [proxy]
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"
+      # Start/stop/restart buttons stay off: the UI is for reading only.
+      DOZZLE_ENABLE_ACTIONS: "false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dozzle.rule=Host(`${DOZZLE_HOST:?set DOZZLE_HOST in .env}`)
+      - traefik.http.routers.dozzle.entrypoints=websecure
+      - traefik.http.routers.dozzle.tls.certresolver=letsencryptresolver
+      # Same basic-auth login as the Traefik dashboard (defined on the traefik service).
+      - traefik.http.routers.dozzle.middlewares=dashboard-auth,secure-headers
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
 
 networks:
   proxy:
