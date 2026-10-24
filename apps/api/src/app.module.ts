@@ -25,7 +25,8 @@ import { TasksModule } from './tasks/tasks.module.js';
           limit: 20,
         },
       ],
-      getTracker: (req) => req.headers['cf-connecting-ip'] ?? req.ip, // see step 4
+      // Behind Cloudflare + Traefik, req.ip is Traefik's address; Cloudflare sends the real client IP.
+      getTracker: (req) => req.headers['cf-connecting-ip'] ?? req.ip,
     }),
     ScheduleModule.forRoot(),
     TasksModule,

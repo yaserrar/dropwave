@@ -105,9 +105,17 @@ export class S3Service {
     );
   }
 
-  async deleteObjects(keys: string[]): Promise<void> {
-    if (keys.length === 0) return;
-    await this.client.send(
+  /**
+   * Deletes up to 1000 objects in one request. S3 reports per-key failures in the
+   * response instead of throwing, so this returns which keys were actually deleted.
+   * Keys that don't exist count as deleted.
+   */
+  async deleteObjects(keys: string[]): Promise<{
+    deleted: string[];
+    errors: { key: string; message: string }[];
+  }> {
+    if (keys.length === 0) return { deleted: [], errors: [] };
+    const result = await this.client.send(
       new DeleteObjectsCommand({
         Bucket: this.bucket,
         Delete: {
@@ -115,6 +123,13 @@ export class S3Service {
         },
       }),
     );
+    return {
+      deleted: (result.Deleted ?? []).flatMap((d) => (d.Key ? [d.Key] : [])),
+      errors: (result.Errors ?? []).map((e) => ({
+        key: e.Key ?? '',
+        message: `${e.Code}: ${e.Message}`,
+      })),
+    };
   }
 
   async checkFileExists(key: string): Promise<boolean> {
@@ -126,7 +141,7 @@ export class S3Service {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
