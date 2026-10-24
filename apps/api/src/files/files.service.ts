@@ -65,6 +65,8 @@ export class FilesService {
         contentType: generateUploadUrlDto.contentType,
         size: generateUploadUrlDto.size,
         status: 'PENDING',
+
+        expiresAt: generateUploadUrlDto.expiresAt,
       },
     });
 

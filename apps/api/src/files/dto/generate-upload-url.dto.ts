@@ -6,7 +6,11 @@ import {
   Max,
   MaxLength,
   Min,
+  IsDate,
+  IsOptional,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+
 import { MAX_FILE_SIZE } from '../../lib/consts.js';
 
 export class GenerateUploadUrlDto {
@@ -22,4 +26,9 @@ export class GenerateUploadUrlDto {
   @Min(1)
   @Max(MAX_FILE_SIZE)
   size: number;
+
+  @IsOptional()
+  @IsDate()
+  @Transform(({ value }) => (value ? new Date(value) : value))
+  expiresAt?: Date;
 }

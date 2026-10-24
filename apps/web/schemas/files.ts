@@ -30,6 +30,8 @@ export const generateSchema = z.object({
       message: "Content type must be a valid MIME type",
     }),
   size: z.number().min(1).max(MAX_FILE_SIZE),
+
+  expiresAt: z.date().optional(),
 });
 
 export type GenerateSchema = z.infer<typeof generateSchema>;
