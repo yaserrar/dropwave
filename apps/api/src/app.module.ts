@@ -6,7 +6,7 @@ import { minutes, ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { FilesModule } from './files/files.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { S3Module } from './s3/s3.module.js';
-import { TaskService } from './task/task.service.js';
+import { TasksModule } from './tasks/tasks.module.js';
 
 @Module({
   imports: [
@@ -28,8 +28,9 @@ import { TaskService } from './task/task.service.js';
       getTracker: (req) => req.headers['cf-connecting-ip'] ?? req.ip, // see step 4
     }),
     ScheduleModule.forRoot(),
+    TasksModule,
   ],
   controllers: [],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }, TaskService], // applies to every route
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }], // applies to every route
 })
 export class AppModule {}
