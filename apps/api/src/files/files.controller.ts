@@ -11,11 +11,11 @@ import { FilesService } from './files.service.js';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 import { minutes, Throttle } from '@nestjs/throttler';
 
-@Throttle({ default: { limit: 3, ttl: minutes(1) } })
 @Controller('files')
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
+  @Throttle({ default: { limit: 3, ttl: minutes(1) } })
   @Post('generate')
   async generatePresignedUrl(
     @Body() generateUploadUrlDto: GenerateUploadUrlDto,
