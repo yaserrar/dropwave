@@ -4,17 +4,22 @@ import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Flash, Link21, ShieldTick, type Icon } from "iconsax-react";
 import { Button } from "@/components/ui/button";
-import { MAX_FILE_SIZE } from "@/lib/consts";
+import { MAX_FILE_SIZE, MIN_EXPIRY_MS } from "@/lib/consts";
 import { formatBytes } from "@/lib/format";
 import { Dropzone } from "./dropzone";
+import { ExpiryPicker } from "./expiry-picker";
 import { FileRow, type UploadItem } from "./file-row";
 import { errorMessage } from "@/lib/utils";
 import { useUploadFile } from "@/hooks/files";
 import axios from "axios";
 
-function createItem(file: File): UploadItem {
-  const base = { id: crypto.randomUUID(), file, percent: 0, shareUrl: "" };
+function createItem(file: File, expiresAt: Date | null): UploadItem {
+  const base = { id: crypto.randomUUID(), file, percent: 0, shareUrl: "", expiresAt };
 
+  // A preset like "1 hour" can go stale if the page stays open; the API would reject it.
+  if (expiresAt && expiresAt.getTime() - Date.now() < MIN_EXPIRY_MS) {
+    return { ...base, status: "error", error: "Expiry time has passed. Pick a new one" };
+  }
   if (file.size > MAX_FILE_SIZE) {
     return {
       ...base,
@@ -30,6 +35,8 @@ function createItem(file: File): UploadItem {
 
 export function Uploader() {
   const [items, setItems] = React.useState<UploadItem[]>([]);
+  // Applies to files dropped after it's set; each row keeps the expiry it was uploaded with.
+  const [expiresAt, setExpiresAt] = React.useState<Date | null>(null);
   const { mutateAsync: uploadFile } = useUploadFile();
   // One AbortController per upload in progress, so Remove / Clear all can cancel it.
   const controllers = React.useRef(new Map<string, AbortController>());
@@ -45,6 +52,7 @@ export function Uploader() {
 
       uploadFile({
         file: item.file,
+        expiresAt: item.expiresAt ?? undefined,
         signal: controller.signal,
         // Hold at 99% until confirm succeeds, so 100% means "really done".
         onProgress: (percent) =>
@@ -71,11 +79,11 @@ export function Uploader() {
 
   const addFiles = React.useCallback(
     (files: File[]) => {
-      const newItems = files.map(createItem).reverse();
+      const newItems = files.map((file) => createItem(file, expiresAt)).reverse();
       setItems((prev) => [...newItems, ...prev]);
       newItems.filter((i) => i.status === "uploading").forEach(startUpload);
     },
-    [startUpload],
+    [startUpload, expiresAt],
   );
 
   const remove = (id: string) => {
@@ -98,7 +106,10 @@ export function Uploader() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Dropzone onFiles={addFiles} />
+      <div className="flex flex-col gap-3">
+        <Dropzone onFiles={addFiles} />
+        <ExpiryPicker value={expiresAt} onChange={setExpiresAt} />
+      </div>
 
       <AnimatePresence mode="popLayout" initial={false}>
         {items.length > 0 ? (

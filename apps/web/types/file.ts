@@ -1,6 +1,8 @@
 //------------------------------------------------
 export type UploadArgs = {
   file: File;
+  /** When the share link stops working; omit for a link that never expires. */
+  expiresAt?: Date;
   onProgress?: (progress: number) => void;
   signal?: AbortSignal;
 };

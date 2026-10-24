@@ -9,7 +9,12 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { randomUUID } from 'crypto';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
 import { S3Service } from '../s3/s3.service.js';
-import { S3_UPLOAD_EXPIRES_IN, S3_DOWNLOAD_EXPIRES_IN } from '../lib/consts.js';
+import {
+  MAX_EXPIRY_MS,
+  MIN_EXPIRY_MS,
+  S3_DOWNLOAD_EXPIRES_IN,
+  S3_UPLOAD_EXPIRES_IN,
+} from '../lib/consts.js';
 import { previewKind } from '../lib/preview.js';
 
 @Injectable()
@@ -45,8 +50,31 @@ export class FilesService {
     return file;
   }
 
+  /**
+   * The optional expiry as a Date, or null for "never". The DTO checks it's a valid
+   * date; this checks it's a sensible one. The ValidationPipe doesn't transform,
+   * so at runtime the value is still the ISO string the client sent.
+   */
+  private parseExpiry(expiresAt: Date | string | undefined): Date | null {
+    this.logger.log(expiresAt);
+    if (!expiresAt) return null;
+    const date = new Date(expiresAt);
+    const fromNow = date.getTime() - Date.now();
+    if (fromNow < MIN_EXPIRY_MS) {
+      throw new BadRequestException(
+        'Expiry must be at least 5 minutes from now',
+      );
+    }
+    if (fromNow > MAX_EXPIRY_MS) {
+      throw new BadRequestException('Expiry can be at most 30 days from now');
+    }
+    return date;
+  }
+
   // Size and type limits are enforced by GenerateUploadUrlDto before this runs.
   async generatePresignedUrl(generateUploadUrlDto: GenerateUploadUrlDto) {
+    const expiresAt = this.parseExpiry(generateUploadUrlDto.expiresAt);
+
     // One id for both the row and the S3 key keeps them easy to match up.
     const fileId = randomUUID();
     const fileKey = this.s3Service.buildFileKey(fileId);
@@ -65,8 +93,7 @@ export class FilesService {
         contentType: generateUploadUrlDto.contentType,
         size: generateUploadUrlDto.size,
         status: 'PENDING',
-
-        expiresAt: generateUploadUrlDto.expiresAt,
+        expiresAt,
       },
     });
 

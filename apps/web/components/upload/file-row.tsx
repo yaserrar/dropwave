@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { iconForFile } from "@/lib/file-icons";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type UploadItem = {
@@ -17,6 +17,8 @@ export type UploadItem = {
   status: "uploading" | "done" | "error";
   percent: number;
   shareUrl: string;
+  /** Share-link expiry this file was uploaded with; null = never. */
+  expiresAt: Date | null;
   error?: string;
 };
 
@@ -134,7 +136,14 @@ function StatusLine({ item, loaded }: { item: UploadItem; loaded: number }) {
       </span>
     );
   }
-  return <span className="text-xs font-medium text-success-muted">Ready to share</span>;
+  return (
+    <span className="text-xs font-medium text-success-muted">
+      Ready to share
+      {item.expiresAt && (
+        <span className="font-normal text-muted-foreground"> · link expires {formatRelativeTime(item.expiresAt)}</span>
+      )}
+    </span>
+  );
 }
 
 function ShareLink({ url }: { url: string }) {

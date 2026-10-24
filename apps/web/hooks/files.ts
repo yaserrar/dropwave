@@ -8,12 +8,13 @@ import { toast } from "sonner";
 
 export const useUploadFile = () =>
   useMutation({
-    mutationFn: async ({ file, onProgress, signal }: UploadArgs) => {
+    mutationFn: async ({ file, expiresAt, onProgress, signal }: UploadArgs) => {
       const contentType = file.type || "application/octet-stream";
       const { fileId, uploadUrl } = await filesService.generate({
         filename: file.name,
         contentType,
         size: file.size,
+        expiresAt,
       });
       await filesService.uploadToS3(
         uploadUrl,
@@ -57,7 +58,9 @@ export const useGetFileInfo = (fileId: string) =>
     queryFn: () => filesService.getFileInfo(fileId),
     // A 4xx (wrong link, expired) won't change on retry; only retry server/network errors.
     retry: (failureCount, error) => {
-      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
       if (status && status < 500) return false;
       return failureCount < 1;
     },
