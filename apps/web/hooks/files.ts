@@ -37,7 +37,6 @@ export const useShareFile = () =>
     mutationFn: ({ fileId, emails }: ShareArgs) =>
       filesService.share(fileId, { emails }),
     onError: (error) => toast.error(String(errorMessage(error))),
-    onSuccess: () => toast.success("File shared successfully"),
   });
 
 // Only fetched while the preview dialog is open. The URL is valid for an hour,
