@@ -7,6 +7,7 @@ import {
   CopySuccess,
   ImportCurve,
   ShieldTick,
+  Sms,
   TickCircle,
   Timer1,
 } from "iconsax-react";
@@ -22,6 +23,7 @@ import { fileTypeLabel, formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FileInfo, FileStatus } from "@/types/file";
 import { FilePreviewDialog } from "./file-preview-dialog";
+import { ShareByEmail } from "./share-by-email";
 
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -49,6 +51,9 @@ export function SharedFileCard({
   const expiresSoon = file.expiresAt
     ? new Date(file.expiresAt).getTime() - Date.now() < DAY_MS
     : false;
+  // The API only emails files that passed the check, like it only serves them.
+  const canEmail = file.status === "UPLOADED";
+  const [emailOpen, setEmailOpen] = React.useState(false);
 
   return (
     <motion.div
@@ -134,6 +139,34 @@ export function SharedFileCard({
             <FilePreviewDialog file={file} downloadUrl={downloadUrl} />
             <CopyLinkButton />
           </motion.div>
+
+          <motion.div variants={rise} className="mt-3">
+            <EmailToggle
+              open={emailOpen}
+              disabled={!canEmail}
+              onToggle={() => setEmailOpen((open) => !open)}
+            />
+          </motion.div>
+
+          <AnimatePresence initial={false}>
+            {emailOpen && canEmail && (
+              <motion.div
+                key="email"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                // The padding, offset by the negative margin, leaves room for the input's focus ring.
+                className="-mx-1 -mb-1 self-stretch overflow-hidden px-1 pb-1"
+              >
+                <ShareByEmail
+                  fileId={file.id}
+                  size="lg"
+                  onSent={() => setEmailOpen(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         <div className="relative flex items-center justify-center gap-1.5 border-t bg-surface/60 px-6 py-3 text-xs text-muted-foreground">
@@ -295,6 +328,33 @@ function CopyLinkButton() {
       </TooltipTrigger>
       <TooltipContent>{copied ? "Copied" : "Copy link"}</TooltipContent>
     </Tooltip>
+  );
+}
+
+// A text button under the actions rather than a fourth icon beside them: that row
+// has no room left on a phone, and downloading stays the main action.
+function EmailToggle({
+  open,
+  disabled,
+  onToggle,
+}: {
+  open: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className={cn(!open && "text-muted-foreground")}
+      aria-expanded={open}
+      disabled={disabled}
+      onClick={onToggle}
+    >
+      <Sms className="size-3.5" color="currentColor" />
+      Send to someone by email
+    </Button>
   );
 }
 

@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { iconForFile } from "@/lib/file-icons";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ShareByEmail } from "./share-by-email";
+import { ShareByEmail } from "@/components/share/share-by-email";
 
 export type UploadItem = {
   id: string;

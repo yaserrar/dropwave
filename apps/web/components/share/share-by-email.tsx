@@ -31,7 +31,16 @@ function parseEmails(value: string): { emails: string[] } | { error: string } {
   };
 }
 
-export function ShareByEmail({ fileId, onSent }: { fileId: string; onSent: () => void }) {
+export function ShareByEmail({
+  fileId,
+  onSent,
+  size = "default",
+}: {
+  fileId: string;
+  onSent: () => void;
+  /** "lg" matches the share page's 44px buttons. */
+  size?: "default" | "lg";
+}) {
   const [value, setValue] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const { mutate: share, isPending } = useShareFile();
@@ -68,7 +77,7 @@ export function ShareByEmail({ fileId, onSent }: { fileId: string; onSent: () =>
   };
 
   return (
-    <form onSubmit={submit} noValidate className="mt-2 flex flex-col gap-1.5">
+    <form onSubmit={submit} noValidate className="mt-2 flex flex-col gap-1.5 text-left">
       <label htmlFor={inputId} className="sr-only">
         Email addresses
       </label>
@@ -88,8 +97,14 @@ export function ShareByEmail({ fileId, onSent }: { fileId: string; onSent: () =>
           readOnly={isPending}
           aria-invalid={!!error}
           aria-describedby={hintId}
+          className={cn(size === "lg" && "h-11 px-3")}
         />
-        <Button type="submit" disabled={isPending} className="min-w-22">
+        <Button
+          type="submit"
+          disabled={isPending}
+          size={size === "lg" ? "lg" : "default"}
+          className={cn("min-w-22", size === "lg" && "h-11 rounded-lg")}
+        >
           <Send2 className="size-3.5" color="currentColor" />
           {isPending ? "Sending" : "Send"}
         </Button>
