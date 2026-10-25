@@ -57,7 +57,6 @@ export class FilesService {
    * so at runtime the value is still the ISO string the client sent.
    */
   private parseExpiry(expiresAt: Date | string | undefined): Date | null {
-    this.logger.log(expiresAt);
     if (!expiresAt) return null;
     const date = new Date(expiresAt);
     const fromNow = date.getTime() - Date.now();
@@ -99,7 +98,15 @@ export class FilesService {
     });
 
     // Don't log the URL itself: anyone holding it can upload until it expires.
-    this.logger.log(`Generated upload URL for file ${fileId}`);
+    this.logger.log(
+      {
+        fileId,
+        size: generateUploadUrlDto.size,
+        contentType: generateUploadUrlDto.contentType,
+        expiresAt,
+      },
+      'Upload started',
+    );
 
     return { fileId, uploadUrl };
   }
@@ -137,6 +144,10 @@ export class FilesService {
     // (already checked against MAX_FILE_SIZE by the DTO) is actually enforced.
     if (object.size !== existingFile.size) {
       await this.s3Service.deleteObject(existingFile.key);
+      this.logger.warn(
+        { fileId, declaredSize: existingFile.size, actualSize: object.size },
+        'Upload rejected: size does not match the declared size',
+      );
       throw new BadRequestException('Uploaded file size does not match');
     }
 
@@ -151,6 +162,7 @@ export class FilesService {
       where: { id: fileId },
       select: { status: true },
     });
+    this.logger.log({ fileId, status }, 'Upload confirmed');
     return { fileId, status };
   }
 
@@ -172,7 +184,10 @@ export class FilesService {
     });
     // Already cleaned up (e.g. expired): nothing to update, and no reason for Lambda to retry.
     if (!file) {
-      this.logger.warn(`Scan result for unknown key ${result.key}; ignoring`);
+      this.logger.warn(
+        { key: result.key },
+        'Scan result for an unknown file; ignoring',
+      );
       return;
     }
 
@@ -186,7 +201,15 @@ export class FilesService {
           scanReason: result.reason,
         },
       });
-      this.logger.warn(`Removed file ${file.id}: ${result.reason}`);
+      this.logger.warn(
+        {
+          fileId: file.id,
+          reason: result.reason,
+          declaredType: result.declaredType,
+          detectedType: result.detectedType,
+        },
+        'File removed: failed the type check',
+      );
       return;
     }
 
@@ -196,6 +219,10 @@ export class FilesService {
       data: { scanVerdict: 'CLEAN' },
     });
     await this.promoteIfClean(file.id);
+    this.logger.log(
+      { fileId: file.id, detectedType: result.detectedType },
+      'File passed the type check',
+    );
   }
 
   // Returns the URL as JSON (not a redirect) so the browser can fetch text
@@ -226,6 +253,7 @@ export class FilesService {
         kind === 'text' ? 'text/plain; charset=utf-8' : file.contentType,
     });
 
+    this.logger.log({ fileId, kind }, 'Preview opened');
     return { kind, url };
   }
 
@@ -242,10 +270,12 @@ export class FilesService {
       expiresIn: S3_DOWNLOAD_EXPIRES_IN,
     });
 
-    await this.prisma.file.update({
+    const { downloadCount } = await this.prisma.file.update({
       where: { id: fileId },
       data: { downloadCount: { increment: 1 } },
+      select: { downloadCount: true },
     });
+    this.logger.log({ fileId, downloadCount }, 'Download started');
 
     return url;
   }

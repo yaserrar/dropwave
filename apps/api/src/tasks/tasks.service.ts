@@ -57,7 +57,10 @@ export class TasksService {
         if (result.errors.length > 0) {
           failed += result.errors.length;
           for (const error of result.errors.slice(0, 5)) {
-            this.logger.warn(`Could not delete ${error.key}: ${error.message}`);
+            this.logger.warn(
+              { key: error.key, error: error.message },
+              'Could not delete expired file from S3',
+            );
           }
           // The failed rows would come back in the next query; leave them for the next run.
           break;
@@ -67,14 +70,13 @@ export class TasksService {
 
       if (deleted > 0 || failed > 0) {
         this.logger.log(
-          `Expired files: ${deleted} deleted, ${failed} failed (retried next run)`,
+          { deleted, failed },
+          'Expired files cleaned up (failures are retried next run)',
         );
       }
     } catch (error) {
-      this.logger.error(
-        'Expired-file cleanup failed',
-        error instanceof Error ? error.stack : String(error),
-      );
+      // An Error as the first argument is logged with its stack (`err` field).
+      this.logger.error(error, 'Expired-file cleanup failed');
     } finally {
       this.running = false;
     }

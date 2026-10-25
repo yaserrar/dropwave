@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Logger,
   RawBodyRequest,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ const MAX_AGE_SECONDS = 5 * 60;
 /** Lets a request through only if the file-check Lambda signed it with SCAN_RESULT_SECRET. */
 @Injectable()
 export class ScanSignatureGuard implements CanActivate {
+  private readonly logger = new Logger(ScanSignatureGuard.name);
+
   constructor(private readonly config: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
@@ -22,12 +25,12 @@ export class ScanSignatureGuard implements CanActivate {
     const timestamp = req.header('x-dropwave-timestamp');
     const signature = req.header('x-dropwave-signature');
     if (!timestamp || !signature || !req.rawBody) {
-      throw new UnauthorizedException('Missing signature');
+      return this.reject('Missing signature');
     }
 
     const age = Math.abs(Date.now() / 1000 - Number(timestamp));
     if (!Number.isFinite(age) || age > MAX_AGE_SECONDS) {
-      throw new UnauthorizedException('Signature expired');
+      return this.reject('Signature expired');
     }
 
     const secret = this.config.getOrThrow<string>('SCAN_RESULT_SECRET');
@@ -42,8 +45,15 @@ export class ScanSignatureGuard implements CanActivate {
     const a = Buffer.from(signature);
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      throw new UnauthorizedException('Invalid signature');
+      return this.reject('Invalid signature');
     }
     return true;
+  }
+
+  // Guards run before the error interceptor, so the request log alone wouldn't say
+  // why; and a forged or replayed scan result is worth noticing.
+  private reject(reason: string): never {
+    this.logger.warn({ reason }, 'Rejected a scan result');
+    throw new UnauthorizedException(reason);
   }
 }
