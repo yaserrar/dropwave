@@ -14,11 +14,15 @@ export type ConfirmResponse = { fileId: string };
 
 export type PreviewResponse = { kind: "image" | "pdf" | "text"; url: string };
 
+export type FileStatus =
+  "PENDING" | "EXPIRED" | "SCANNING" | "REMOVED" | "DELETED" | "UPLOADED";
+
 export type FileInfo = {
   id: string;
   filename: string;
   contentType: string;
   size: number;
+  status: FileStatus;
   createdAt: string;
   expiresAt: string | null;
 };

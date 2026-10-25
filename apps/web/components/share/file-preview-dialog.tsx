@@ -24,7 +24,13 @@ import type { FileInfo } from "@/types/file";
 const MAX_TEXT_CHARS = 100_000;
 
 /** "Preview" button + dialog. Renders nothing for types the browser can't show. */
-export function FilePreviewDialog({ file, downloadUrl }: { file: FileInfo; downloadUrl: string }) {
+export function FilePreviewDialog({
+  file,
+  downloadUrl,
+}: {
+  file: FileInfo;
+  downloadUrl: string;
+}) {
   const [open, setOpen] = React.useState(false);
   const kind = previewKind(file.contentType);
   const preview = useGetPreview(file.id, open && kind !== null);
@@ -35,7 +41,16 @@ export function FilePreviewDialog({ file, downloadUrl }: { file: FileInfo; downl
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="lg" className="h-11 rounded-lg px-3.5" aria-label="Preview file">
+        <Button
+          disabled={file.status !== "UPLOADED"}
+          variant="outline"
+          size="lg"
+          className={cn(
+            "h-11 rounded-lg px-3.5",
+            file.status !== "UPLOADED" && "cursor-not-allowed opacity-50",
+          )}
+          aria-label="Preview file"
+        >
           <Eye className="size-4.5" color="currentColor" />
           <span className="max-sm:hidden">Preview</span>
         </Button>
@@ -44,12 +59,19 @@ export function FilePreviewDialog({ file, downloadUrl }: { file: FileInfo; downl
       <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="flex-row items-center gap-3 border-b px-4 py-3 pr-12 text-left">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-surface text-brand-muted">
-            <FileIcon variant="Bulk" className="size-4.5" color="currentColor" />
+            <FileIcon
+              variant="Bulk"
+              className="size-4.5"
+              color="currentColor"
+            />
           </div>
           <div className="min-w-0">
-            <DialogTitle className="truncate font-heading text-sm font-medium">{file.filename}</DialogTitle>
+            <DialogTitle className="truncate font-heading text-sm font-medium">
+              {file.filename}
+            </DialogTitle>
             <DialogDescription className="font-mono text-xs">
-              {fileTypeLabel(file.filename, file.contentType)} · {formatBytes(file.size)}
+              {fileTypeLabel(file.filename, file.contentType)} ·{" "}
+              {formatBytes(file.size)}
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -60,7 +82,11 @@ export function FilePreviewDialog({ file, downloadUrl }: { file: FileInfo; downl
           ) : preview.isError || !preview.data ? (
             <PreviewError />
           ) : (
-            <PreviewBody kind={kind} url={preview.data.url} filename={file.filename} />
+            <PreviewBody
+              kind={kind}
+              url={preview.data.url}
+              filename={file.filename}
+            />
           )}
         </div>
 
@@ -68,13 +94,21 @@ export function FilePreviewDialog({ file, downloadUrl }: { file: FileInfo; downl
         <DialogFooter className="m-0 flex-row justify-end gap-2 border-t px-4 py-3">
           {preview.data && kind !== "text" && (
             <Button asChild variant="ghost" size="lg">
-              <a href={preview.data.url} target="_blank" rel="noopener noreferrer">
+              <a
+                href={preview.data.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <ExportSquare className="size-4" color="currentColor" />
                 Open in new tab
               </a>
             </Button>
           )}
-          <Button asChild size="lg" className="bg-brand text-brand-foreground hover:bg-brand-hover">
+          <Button
+            asChild
+            size="lg"
+            className="bg-brand text-brand-foreground hover:bg-brand-hover"
+          >
             <a href={downloadUrl}>
               <ImportCurve className="size-4" color="currentColor" />
               Download
@@ -86,7 +120,15 @@ export function FilePreviewDialog({ file, downloadUrl }: { file: FileInfo; downl
   );
 }
 
-function PreviewBody({ kind, url, filename }: { kind: PreviewKind; url: string; filename: string }) {
+function PreviewBody({
+  kind,
+  url,
+  filename,
+}: {
+  kind: PreviewKind;
+  url: string;
+  filename: string;
+}) {
   if (kind === "image") return <ImagePreview url={url} filename={filename} />;
   if (kind === "pdf") return <PdfPreview url={url} filename={filename} />;
   return <TextPreview url={url} />;
@@ -109,7 +151,9 @@ function ImagePreview({ url, filename }: { url: string; filename: string }) {
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
         initial={{ opacity: 0, scale: 0.98 }}
-        animate={loaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.98 }}
+        animate={
+          loaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.98 }
+        }
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         className="max-h-[70dvh] w-auto max-w-full rounded-lg object-contain shadow-lg"
       />
@@ -127,7 +171,10 @@ function PdfPreview({ url, filename }: { url: string; filename: string }) {
         src={url}
         title={`Preview of ${filename}`}
         onLoad={() => setLoaded(true)}
-        className={cn("size-full transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0")}
+        className={cn(
+          "size-full transition-opacity duration-300",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
       />
     </div>
   );
@@ -147,7 +194,8 @@ function TextPreview({ url }: { url: string }) {
       </pre>
       {truncated && (
         <p className="border-t px-4 py-2 text-xs text-muted-foreground">
-          Showing the first {MAX_TEXT_CHARS.toLocaleString()} characters. Download the file to see all of it.
+          Showing the first {MAX_TEXT_CHARS.toLocaleString()} characters.
+          Download the file to see all of it.
         </p>
       )}
     </div>
@@ -156,21 +204,35 @@ function TextPreview({ url }: { url: string }) {
 
 function PreviewLoading({ className }: { className?: string }) {
   return (
-    <div className={cn("flex min-h-72 flex-col items-center justify-center gap-3", className)} aria-busy aria-label="Loading preview">
+    <div
+      className={cn(
+        "flex min-h-72 flex-col items-center justify-center gap-3",
+        className,
+      )}
+      aria-busy
+      aria-label="Loading preview"
+    >
       <span className="dot-running size-2 rounded-full" />
-      <span className="text-shimmer-brand text-sm font-medium">Loading preview</span>
+      <span className="text-shimmer-brand text-sm font-medium">
+        Loading preview
+      </span>
     </div>
   );
 }
 
 function PreviewError() {
   return (
-    <div role="alert" className="flex min-h-72 flex-col items-center justify-center gap-2 px-6 text-center">
+    <div
+      role="alert"
+      className="flex min-h-72 flex-col items-center justify-center gap-2 px-6 text-center"
+    >
       <div className="flex size-10 items-center justify-center rounded-xl bg-danger-subtle text-danger-muted">
         <Danger variant="Bulk" className="size-5" color="currentColor" />
       </div>
       <p className="text-sm font-medium">Couldn&apos;t load the preview</p>
-      <p className="text-xs text-muted-foreground">You can still download the file.</p>
+      <p className="text-xs text-muted-foreground">
+        You can still download the file.
+      </p>
     </div>
   );
 }

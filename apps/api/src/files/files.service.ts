@@ -41,7 +41,7 @@ export class FilesService {
     const file = await this.findOne(fileId);
 
     // A PENDING file looks missing, so half-finished uploads can't be downloaded.
-    if (!file || file.status !== 'UPLOADED') {
+    if (!file || (file.status !== 'UPLOADED' && file.status !== 'SCANNING')) {
       throw new NotFoundException('File not found');
     }
     if (file.expiresAt && file.expiresAt < new Date()) {
@@ -107,20 +107,11 @@ export class FilesService {
   async getFileInfo(fileId: string) {
     const file = await this.findAvailable(fileId);
 
-    const { status: _status, ...info } = file;
-    return info;
+    return file;
   }
 
   async confirmUpload(fileId: string) {
-    const existingFile = await this.findOne(fileId);
-    if (!existingFile) {
-      throw new NotFoundException('File not found');
-    }
-
-    // Safe to call again, e.g. if the client retries after a network error.
-    if (existingFile.status === 'UPLOADED') {
-      return { fileId };
-    }
+    const existingFile = await this.findAvailable(fileId);
 
     const object = await this.s3Service.getObjectInfo(existingFile.key);
     if (!object) {
@@ -132,6 +123,21 @@ export class FilesService {
     if (object.size !== existingFile.size) {
       await this.s3Service.deleteObject(existingFile.key);
       throw new BadRequestException('Uploaded file size does not match');
+    }
+
+    await this.prisma.file.update({
+      where: { id: fileId },
+      data: { status: 'SCANNING' },
+    });
+
+    return { fileId };
+  }
+
+  async markScanComplete(fileId: string) {
+    const file = await this.findAvailable(fileId);
+
+    if (file.status !== 'SCANNING') {
+      throw new BadRequestException('File is not in scanning state');
     }
 
     await this.prisma.file.update({
@@ -167,6 +173,10 @@ export class FilesService {
 
   async getDownloadUrl(fileId: string) {
     const file = await this.findAvailable(fileId);
+
+    if (file.status === 'SCANNING') {
+      throw new BadRequestException('File is still being scanned');
+    }
 
     const url = await this.s3Service.createDownloadUrl({
       key: file.key,

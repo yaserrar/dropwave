@@ -33,6 +33,12 @@ export class FilesController {
     return this.filesService.confirmUpload(fileId);
   }
 
+  // Scan is finished by Lambda
+  @Post(':id/scan-complete')
+  async scanComplete(@Param('id', ParseUUIDPipe) fileId: string) {
+    return this.filesService.markScanComplete(fileId);
+  }
+
   // Images, PDFs and text only: a short-lived S3 URL that displays the file instead of downloading it.
   @Get(':id/preview')
   async preview(@Param('id', ParseUUIDPipe) fileId: string) {

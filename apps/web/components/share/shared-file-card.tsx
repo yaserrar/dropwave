@@ -2,14 +2,25 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Copy, CopySuccess, ImportCurve, ShieldTick, TickCircle, Timer1 } from "iconsax-react";
+import {
+  Copy,
+  CopySuccess,
+  ImportCurve,
+  ShieldTick,
+  TickCircle,
+  Timer1,
+} from "iconsax-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { iconForFile } from "@/lib/file-icons";
 import { fileTypeLabel, formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { FileInfo } from "@/types/file";
+import type { FileInfo, FileStatus } from "@/types/file";
 import { FilePreviewDialog } from "./file-preview-dialog";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -20,12 +31,24 @@ const stagger = {
 };
 const rise = {
   hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const },
+  },
 };
 
-export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; downloadUrl: string }) {
+export function SharedFileCard({
+  file,
+  downloadUrl,
+}: {
+  file: FileInfo;
+  downloadUrl: string;
+}) {
   const FileIcon = iconForFile(file.filename, file.contentType);
-  const expiresSoon = file.expiresAt ? new Date(file.expiresAt).getTime() - Date.now() < DAY_MS : false;
+  const expiresSoon = file.expiresAt
+    ? new Date(file.expiresAt).getTime() - Date.now() < DAY_MS
+    : false;
 
   return (
     <motion.div
@@ -36,19 +59,35 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
       className="frame-double"
     >
       <div className="relative isolate overflow-hidden rounded-[13px] border bg-card">
-        <div aria-hidden className="bg-dot-grid pointer-events-none absolute inset-x-0 top-0 h-48 opacity-70 mask-[radial-gradient(ellipse_70%_100%_at_50%_0%,black,transparent_80%)]" />
+        <div
+          aria-hidden
+          className="bg-dot-grid pointer-events-none absolute inset-x-0 top-0 h-48 opacity-70 mask-[radial-gradient(ellipse_70%_100%_at_50%_0%,black,transparent_80%)]"
+        />
 
-        <motion.div variants={stagger} initial="hidden" animate="show" className="relative flex flex-col items-center px-6 pt-10 pb-6 text-center sm:px-10">
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative flex flex-col items-center px-6 pt-10 pb-6 text-center sm:px-10"
+        >
           <motion.div variants={rise}>
             <FileTile icon={FileIcon} />
           </motion.div>
-
-          <motion.span
-            variants={rise}
-            className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-brand-subtle px-2.5 py-0.5 text-xs font-medium text-brand-muted"
-          >
-            Shared with you
-          </motion.span>
+          {file.status == "UPLOADED" ? (
+            <motion.span
+              variants={rise}
+              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-brand-subtle px-2.5 py-0.5 text-xs font-medium text-brand-muted"
+            >
+              Shared with you
+            </motion.span>
+          ) : (
+            <motion.span
+              variants={rise}
+              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-amber-500/25 px-2.5 py-0.5 text-xs font-medium text-amber-600"
+            >
+              File is being scanned
+            </motion.span>
+          )}
 
           <motion.h1
             variants={rise}
@@ -58,12 +97,20 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
             {file.filename}
           </motion.h1>
 
-          <motion.p variants={rise} className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <motion.p
+            variants={rise}
+            className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+          >
             <span className="rounded-sm border bg-muted px-1.5 py-px font-mono text-2xs font-medium text-foreground">
               {fileTypeLabel(file.filename, file.contentType)}
             </span>
-            <span className="font-mono tabular-nums">{formatBytes(file.size)}</span>
-            <span aria-hidden className="size-1 rounded-full bg-border-strong" />
+            <span className="font-mono tabular-nums">
+              {formatBytes(file.size)}
+            </span>
+            <span
+              aria-hidden
+              className="size-1 rounded-full bg-border-strong"
+            />
             <span>Uploaded {formatRelativeTime(file.createdAt)}</span>
           </motion.p>
 
@@ -72,7 +119,9 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
               variants={rise}
               className={cn(
                 "mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs",
-                expiresSoon ? "bg-warning-subtle text-warning-muted" : "text-muted-foreground",
+                expiresSoon
+                  ? "bg-warning-subtle text-warning-muted"
+                  : "text-muted-foreground",
               )}
             >
               <Timer1 className="size-3.5" color="currentColor" />
@@ -81,14 +130,17 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
           )}
 
           <motion.div variants={rise} className="mt-8 flex w-full gap-2">
-            <DownloadButton href={downloadUrl} />
+            <DownloadButton href={downloadUrl} status={file.status} />
             <FilePreviewDialog file={file} downloadUrl={downloadUrl} />
             <CopyLinkButton />
           </motion.div>
         </motion.div>
 
         <div className="relative flex items-center justify-center gap-1.5 border-t bg-surface/60 px-6 py-3 text-xs text-muted-foreground">
-          <ShieldTick className="size-3.5 shrink-0 text-success-muted" color="currentColor" />
+          <ShieldTick
+            className="size-3.5 shrink-0 text-success-muted"
+            color="currentColor"
+          />
           Stored privately · only people with this link can download it
         </div>
       </div>
@@ -97,7 +149,11 @@ export function SharedFileCard({ file, downloadUrl }: { file: FileInfo; download
 }
 
 /** File icon on a raised tile, with slow waves rolling out behind it. */
-function FileTile({ icon: FileIcon }: { icon: ReturnType<typeof iconForFile> }) {
+function FileTile({
+  icon: FileIcon,
+}: {
+  icon: ReturnType<typeof iconForFile>;
+}) {
   return (
     <div className="relative">
       {[0, 1].map((i) => (
@@ -106,10 +162,18 @@ function FileTile({ icon: FileIcon }: { icon: ReturnType<typeof iconForFile> }) 
           aria-hidden
           className="pointer-events-none absolute inset-0 rounded-3xl border border-brand/40"
           animate={{ scale: [1, 1.9], opacity: [0.5, 0] }}
-          transition={{ duration: 3, repeat: Infinity, delay: i * 1.5, ease: "easeOut" }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            delay: i * 1.5,
+            ease: "easeOut",
+          }}
         />
       ))}
-      <div aria-hidden className="absolute inset-2 rounded-full bg-brand/30 blur-xl" />
+      <div
+        aria-hidden
+        className="absolute inset-2 rounded-full bg-brand/30 blur-xl"
+      />
       <motion.div
         animate={{ y: [0, -4, 0] }}
         transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
@@ -121,7 +185,13 @@ function FileTile({ icon: FileIcon }: { icon: ReturnType<typeof iconForFile> }) 
   );
 }
 
-function DownloadButton({ href }: { href: string }) {
+function DownloadButton({
+  href,
+  status,
+}: {
+  href: string;
+  status: FileStatus;
+}) {
   const [started, setStarted] = React.useState(false);
 
   React.useEffect(() => {
@@ -134,10 +204,19 @@ function DownloadButton({ href }: { href: string }) {
     <Button
       asChild
       size="lg"
-      className="group/download h-11 flex-1 rounded-lg bg-brand text-sm text-brand-foreground shadow-md hover:bg-brand-hover"
+      className={cn(
+        "group/download h-11 flex-1 rounded-lg bg-brand text-sm text-brand-foreground shadow-md hover:bg-brand-hover",
+
+        status !== "UPLOADED" && "cursor-not-allowed opacity-50",
+      )}
+      disabled={status !== "UPLOADED"}
     >
       {/* The API redirects to a short-lived S3 URL that is served as an attachment. */}
-      <a href={href} onClick={() => setStarted(true)}>
+      <a
+        href={status == "UPLOADED" ? href : undefined}
+        onClick={() => (status == "UPLOADED" ? setStarted(true) : undefined)}
+        role={status == "UPLOADED" ? "link" : undefined}
+      >
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
             key={started ? "started" : "idle"}
@@ -149,12 +228,19 @@ function DownloadButton({ href }: { href: string }) {
           >
             {started ? (
               <>
-                <TickCircle variant="Bold" className="size-4.5" color="currentColor" />
+                <TickCircle
+                  variant="Bold"
+                  className="size-4.5"
+                  color="currentColor"
+                />
                 Download started
               </>
             ) : (
               <>
-                <ImportCurve className="size-4.5 transition-transform duration-300 group-hover/download:translate-y-0.5" color="currentColor" />
+                <ImportCurve
+                  className="size-4.5 transition-transform duration-300 group-hover/download:translate-y-0.5"
+                  color="currentColor"
+                />
                 Download file
               </>
             )}
@@ -180,16 +266,28 @@ function CopyLinkButton() {
       setCopied(true);
       toast.success("Link copied");
     } catch {
-      toast.error("Couldn't copy the link", { description: "Copy it from the address bar instead." });
+      toast.error("Couldn't copy the link", {
+        description: "Copy it from the address bar instead.",
+      });
     }
   };
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button type="button" variant="outline" size="icon-lg" className="size-11 rounded-lg" aria-label="Copy link" onClick={copy}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-lg"
+          className="size-11 rounded-lg"
+          aria-label="Copy link"
+          onClick={copy}
+        >
           {copied ? (
-            <CopySuccess className="size-4.5 text-success" color="currentColor" />
+            <CopySuccess
+              className="size-4.5 text-success"
+              color="currentColor"
+            />
           ) : (
             <Copy className="size-4.5" color="currentColor" />
           )}

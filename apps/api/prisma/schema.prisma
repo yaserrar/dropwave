@@ -14,9 +14,11 @@ datasource db {
 
 enum FileStatus {
   PENDING 
-  UPLOADED 
   EXPIRED
+  SCANNING
+  REMOVED
   DELETED
+  UPLOADED 
 }
 
 model File {
