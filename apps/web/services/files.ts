@@ -1,7 +1,13 @@
-import type { GenerateSchema } from "@/schemas/files";
+import type { GenerateSchema, ShareSchema } from "@/schemas/files";
 import axios from "@/lib/axios";
 import axiosBase from "axios";
-import { GenerateResponse, ConfirmResponse, FileInfo, PreviewResponse } from "@/types/file";
+import {
+  GenerateResponse,
+  ConfirmResponse,
+  FileInfo,
+  PreviewResponse,
+  ShareResponse,
+} from "@/types/file";
 
 const filesService = {
   generate: async (data: GenerateSchema) => {
@@ -39,6 +45,9 @@ const filesService = {
   // Plain axios: this is a presigned S3 URL, not our API.
   getText: async (url: string) => {
     return (await axiosBase.get(url, { responseType: "text" })).data as string;
+  },
+  share: async (id: string, data: ShareSchema) => {
+    return (await axios.post(`/files/${id}/share`, data)).data as ShareResponse;
   },
   download: async (id: string) => {
     return (await axios.get(`/files/${id}/download`, { responseType: "blob" }))

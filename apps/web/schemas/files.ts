@@ -1,4 +1,4 @@
-import { MAX_FILE_SIZE } from "@/lib/consts";
+import { MAX_FILE_SIZE, MAX_SHARE_RECIPIENTS } from "@/lib/consts";
 import { z } from "zod";
 
 const VALID_MIME_TYPE = [
@@ -41,3 +41,12 @@ export const confirmSchema = z.object({
 });
 
 export type ConfirmSchema = z.infer<typeof confirmSchema>;
+
+export const shareSchema = z.object({
+  emails: z
+    .array(z.email())
+    .min(1, "Enter at least one email address")
+    .max(MAX_SHARE_RECIPIENTS, `Up to ${MAX_SHARE_RECIPIENTS} addresses at a time`),
+});
+
+export type ShareSchema = z.infer<typeof shareSchema>;

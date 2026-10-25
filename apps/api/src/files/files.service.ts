@@ -299,8 +299,11 @@ export class FilesService {
   async share(fileId: string, shareFileDto: ShareFileDto) {
     const file = await this.findAvailable(fileId);
 
+    // findAvailable only lets UPLOADED and SCANNING through; the type check takes seconds.
     if (file.status !== 'UPLOADED') {
-      throw new BadRequestException('File is not available for sharing');
+      throw new BadRequestException(
+        'This file is still being checked. Try again in a few seconds.',
+      );
     }
 
     const email = shareEmail(file, `${this.appUrl}/s/${file.id}`);

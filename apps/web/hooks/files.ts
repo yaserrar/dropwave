@@ -1,7 +1,7 @@
 import { qk } from "@/lib/query-keys";
 import { errorMessage } from "@/lib/utils";
 import filesService from "@/services/files";
-import { UploadArgs } from "@/types/file";
+import { ShareArgs, UploadArgs } from "@/types/file";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
@@ -30,6 +30,14 @@ export const useUploadFile = () =>
       if (axios.isCancel(error)) return;
       toast.error(errorMessage(error));
     },
+  });
+
+export const useShareFile = () =>
+  useMutation({
+    mutationFn: ({ fileId, emails }: ShareArgs) =>
+      filesService.share(fileId, { emails }),
+    onError: (error) => toast.error(String(errorMessage(error))),
+    onSuccess: () => toast.success("File shared successfully"),
   });
 
 // Only fetched while the preview dialog is open. The URL is valid for an hour,

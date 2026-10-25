@@ -14,7 +14,7 @@ import { useUploadFile } from "@/hooks/files";
 import axios from "axios";
 
 function createItem(file: File, expiresAt: Date | null): UploadItem {
-  const base = { id: crypto.randomUUID(), file, percent: 0, shareUrl: "", expiresAt };
+  const base = { id: crypto.randomUUID(), file, percent: 0, fileId: "", shareUrl: "", expiresAt };
 
   // A preset like "1 hour" can go stale if the page stays open; the API would reject it.
   if (expiresAt && expiresAt.getTime() - Date.now() < MIN_EXPIRY_MS) {
@@ -62,6 +62,7 @@ export function Uploader() {
           update(item.id, {
             status: "done",
             percent: 100,
+            fileId,
             shareUrl: `${window.location.origin}/s/${fileId}`,
           }),
         )

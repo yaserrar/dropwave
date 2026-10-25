@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CloseCircle, Copy, CopySuccess, ExportSquare, Link21, TickCircle, Warning2 } from "iconsax-react";
+import { CloseCircle, Copy, CopySuccess, ExportSquare, Link21, Sms, TickCircle, Warning2 } from "iconsax-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,12 +10,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { iconForFile } from "@/lib/file-icons";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ShareByEmail } from "./share-by-email";
 
 export type UploadItem = {
   id: string;
   file: File;
   status: "uploading" | "done" | "error";
   percent: number;
+  /** The API's id for the file, once the upload is confirmed. */
+  fileId: string;
   shareUrl: string;
   /** Share-link expiry this file was uploaded with; null = never. */
   expiresAt: Date | null;
@@ -108,11 +111,36 @@ export function FileRow({ item, onRemove }: { item: UploadItem; onRemove: () => 
             animate={{ height: "auto", opacity: 1 }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           >
-            <ShareLink url={item.shareUrl} />
+            <SharePanel url={item.shareUrl} fileId={item.fileId} />
           </motion.div>
         )}
       </AnimatePresence>
     </motion.li>
+  );
+}
+
+function SharePanel({ url, fileId }: { url: string; fileId: string }) {
+  const [emailOpen, setEmailOpen] = React.useState(false);
+
+  return (
+    <>
+      <ShareLink url={url} emailOpen={emailOpen} onToggleEmail={() => setEmailOpen((open) => !open)} />
+      <AnimatePresence initial={false}>
+        {emailOpen && (
+          <motion.div
+            key="email"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            // The padding, offset by the negative margin, leaves room for the input's focus ring.
+            className="-mx-1 -mb-1 overflow-hidden px-1 pb-1"
+          >
+            <ShareByEmail fileId={fileId} onSent={() => setEmailOpen(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -146,7 +174,15 @@ function StatusLine({ item, loaded }: { item: UploadItem; loaded: number }) {
   );
 }
 
-function ShareLink({ url }: { url: string }) {
+function ShareLink({
+  url,
+  emailOpen,
+  onToggleEmail,
+}: {
+  url: string;
+  emailOpen: boolean;
+  onToggleEmail: () => void;
+}) {
   const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
@@ -186,6 +222,22 @@ function ShareLink({ url }: { url: string }) {
           </Button>
         </TooltipTrigger>
         <TooltipContent>Open in new tab</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant={emailOpen ? "secondary" : "ghost"}
+            size="icon-sm"
+            aria-label="Send by email"
+            aria-expanded={emailOpen}
+            onClick={onToggleEmail}
+            className={cn(!emailOpen && "text-muted-foreground")}
+          >
+            <Sms className="size-4" color="currentColor" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Send by email</TooltipContent>
       </Tooltip>
       <Button type="button" size="sm" variant={copied ? "secondary" : "default"} onClick={copy} className="min-w-24">
         <AnimatePresence mode="wait" initial={false}>
