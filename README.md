@@ -1,159 +1,158 @@
-# Turborepo starter
+# Dropwave
 
-This Turborepo starter is maintained by the Turborepo core team.
+Drop a file, get a private link to share it. No sign-up.
 
-## Using this example
+**Live:** [dropwave.asrar.software](https://dropwave.asrar.software)
 
-Run the following command:
+- Upload files up to 10 MB, with an optional link expiry (5 minutes to 30 days).
+- Share page with a preview for images, PDFs and text, and a download button.
+- Email the link to up to 5 people, from the upload page or the share page.
+- Every upload is checked by an AWS Lambda: its real size, and whether its content matches its declared type. Executables are rejected.
+- Expired files are deleted automatically.
 
-```sh
-npx create-turbo@latest
+## How it works
+
+File bytes never pass through the API. The browser uploads straight to S3 with a presigned URL, and the API only keeps track of each file.
+
+```
+Browser ─(1) POST /api/files/generate ─────────────▶ API ──▶ Postgres   row: PENDING
+Browser ◀──── presigned PUT URL (valid 60 s) ─────── API
+Browser ─(2) PUT the file ─────────────────────────▶ S3  uploads/<id>
+S3 ──────(3) object created ───────────────────────▶ Lambda file-check
+Lambda ──(4) signed POST /api/internal/scan-result ▶ API   clean or rejected
+Browser ─(5) POST /api/files/<id>/confirm ─────────▶ API   PENDING → SCANNING → UPLOADED
 ```
 
-## What's inside?
+Steps 4 and 5 can arrive in either order. Whichever comes last makes the file available.
 
-This Turborepo includes the following packages/apps:
+1. **Upload URL.** The API validates the name, type and declared size, creates the row, and returns a presigned PUT URL. S3 only accepts the upload with the same `Content-Type`.
+2. **File check.** S3 triggers the [`file-check`](apps/file-check) Lambda. It first checks the object's real size, which comes in the S3 event, because a presigned PUT accepts a body of any size. Then it reads the first 4 KB and detects the real format with [`file-type`](https://github.com/sindresorhus/file-type). Files that are empty, over 10 MB, executables, or whose content contradicts their declared type are rejected. It checks file types; it isn't an antivirus.
+3. **Signed result.** The Lambda reports to the API with an HMAC-SHA256 signature over a timestamp and the raw body. The API compares it in constant time and refuses results older than 5 minutes, so a captured request can't be replayed.
+4. **Confirm.** The browser confirms the upload. The API checks that the size in S3 matches the declared size.
+5. **Outcome.** A clean file becomes `UPLOADED`. A rejected one is deleted from S3 and marked `REMOVED`. Downloads redirect to a short-lived presigned GET URL.
 
-### Apps and Packages
+| Status     | Meaning                                       |
+| ---------- | --------------------------------------------- |
+| `PENDING`  | Upload URL issued, upload not confirmed yet   |
+| `SCANNING` | Confirmed, waiting for the Lambda's verdict   |
+| `UPLOADED` | Passed the check; can be downloaded or shared |
+| `REMOVED`  | Failed the check; the S3 object is deleted    |
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+A cron job in the API deletes expired files every 10 minutes, S3 objects first and then their rows.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## API
 
-### Utilities
+| Method | Route                       | Does                                                                    |
+| ------ | --------------------------- | ----------------------------------------------------------------------- |
+| `POST` | `/api/files/generate`       | Creates the file and returns an upload URL (3 per minute per IP)        |
+| `POST` | `/api/files/:id/confirm`    | Checks the uploaded size and starts waiting for the check               |
+| `GET`  | `/api/files/:id`            | File info for the share page                                            |
+| `GET`  | `/api/files/:id/preview`    | URL that displays an image, PDF or text file                            |
+| `GET`  | `/api/files/:id/download`   | Redirects to a download URL                                             |
+| `POST` | `/api/files/:id/share`      | Emails the link to up to 5 addresses (5 requests per 10 minutes per IP) |
+| `POST` | `/api/internal/scan-result` | Verdicts from the Lambda; HMAC-signed                                   |
 
-This Turborepo has some additional tools already setup for you:
+The other public routes allow 20 requests per minute per IP, and the Lambda's route isn't rate-limited. Behind Cloudflare, the client IP comes from `CF-Connecting-IP`.
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+## Stack
 
-### Build
+| Part       | Built with                                                                              |
+| ---------- | --------------------------------------------------------------------------------------- |
+| Web        | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, TanStack Query, Motion                 |
+| API        | NestJS 12, Prisma 7, PostgreSQL, pino structured logs                                   |
+| File check | AWS Lambda (Node.js 24, arm64), bundled with esbuild                                    |
+| AWS        | S3 (storage), SES (emails), IAM role on EC2, so no access keys on the server            |
+| Hosting    | Docker Compose on EC2, Traefik with Let's Encrypt, Cloudflare in front, Dozzle for logs |
+| CI/CD      | GitHub Actions: lint, build images to GHCR, deploy over SSH                             |
+| Monorepo   | Turborepo with npm workspaces, TypeScript everywhere                                    |
 
-To build all apps and packages, run the following command:
+## Repository layout
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```
+apps/
+  web/          Next.js app: upload page and share page (/s/<id>)
+  api/          NestJS API: files, S3, emails, file-check results, cleanup cron
+  file-check/   AWS Lambda that checks every upload (has its own README)
+packages/
+  eslint-config/, typescript-config/   shared config
+deploy/infra/   Traefik, Postgres, pgAdmin, backups and Dozzle for the server
+docker-compose.yml   the app stack (api + web) that CI deploys
+DEPLOY.md            server setup, step by step
 ```
 
-Without global `turbo`, use your package manager:
+## Running locally
 
-```sh
-cd my-turborepo
-npx turbo build
-npm exec turbo build
-npm exec turbo build
+You need Node.js 24+ with npm 11, a PostgreSQL database, and an AWS account with:
+
+- **An S3 bucket.** Its CORS rule must allow `http://localhost:3000` (see [DEPLOY.md](DEPLOY.md#4-s3-cors)).
+- **Credentials** that can put, get and delete objects in the bucket, and send email with SES.
+- **A domain or address verified in SES** to send from. While SES is in sandbox mode, it only sends to verified addresses.
+
+1. Install the dependencies:
+
+   ```sh
+   npm install
+   ```
+
+2. Create `apps/api/.env`:
+
+   ```sh
+   PORT=4000
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/dropwave
+   AWS_REGION=eu-west-3
+   S3_BUCKET=your-bucket
+   # Locally only; on EC2 the instance's IAM role provides credentials.
+   AWS_ACCESS_KEY_ID=...
+   AWS_SECRET_ACCESS_KEY=...
+   # openssl rand -hex 32; the Lambda signs its results with the same value.
+   SCAN_RESULT_SECRET=...
+   # Links in emails point here.
+   APP_URL=http://localhost:3000
+   MAIL_FROM=Dropwave <noreply@your-domain.com>
+   ```
+
+3. Create `apps/web/.env`:
+
+   ```sh
+   NEXT_PUBLIC_API_URL=http://localhost:4000/api
+   ```
+
+4. Generate the Prisma client and create the tables:
+
+   ```sh
+   cd apps/api
+   npx prisma generate
+   npx prisma migrate deploy
+   cd ../..
+   ```
+
+5. Start the web app (port 3000) and the API (port 4000):
+
+   ```sh
+   npm run dev
+   ```
+
+Locally, uploads stay in `SCANNING` unless a file-check Lambda can reach your API: it reports to the URL in its `SCAN_RESULT_URL`. To try the rest of the flow, mark a file as checked in your database:
+
+```sql
+UPDATE files SET status = 'UPLOADED' WHERE id = '<id>';
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### Checks
 
 ```sh
-turbo build --filter=docs
+npm run lint                  # every app
+npm run check-types           # web and file-check
+npm run test -w file-check    # the Lambda's rules, against real file signatures
 ```
 
-Without global `turbo`:
+## Deploying
 
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
-```
+Every push to `main` builds the `api` and `web` images, pushes them to GHCR, and restarts the stack on the server. The API applies pending database migrations when it starts.
 
-### Develop
+- **[DEPLOY.md](DEPLOY.md):** the one-time server setup, covering EC2, Cloudflare DNS, the IAM role, Traefik, Postgres and GitHub secrets.
+- **[apps/file-check/README.md](apps/file-check/README.md):** deploying the Lambda and wiring it to the bucket.
 
-To develop all apps and packages, run the following command:
+## License
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+[MIT](LICENSE)
