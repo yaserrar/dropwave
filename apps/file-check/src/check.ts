@@ -3,6 +3,24 @@ export type Detected = { ext: string; mime: string } | undefined;
 
 export type Verdict = { ok: true } | { ok: false; reason: string };
 
+// Keep in sync with MAX_FILE_SIZE in apps/api/src/lib/consts.ts.
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const toMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+/**
+ * The real size of what landed in S3. The API only validated the size the client
+ * declared, and a presigned PUT accepts any size, so this catches uploads that lied
+ * about it even if the client never calls /confirm.
+ */
+export function checkFileSize(size: number, maxSize = MAX_FILE_SIZE): Verdict {
+  if (size <= 0) return { ok: false, reason: "the file is empty" };
+  if (size > maxSize) {
+    return { ok: false, reason: `the file is ${toMb(size)}, over the ${toMb(maxSize)} limit` };
+  }
+  return { ok: true };
+}
+
 // Programs that run on Windows, Linux or macOS. Rejected whatever type they claim.
 const EXECUTABLES = new Set(["exe", "elf", "macho"]);
 

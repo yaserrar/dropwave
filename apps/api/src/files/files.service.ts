@@ -279,4 +279,16 @@ export class FilesService {
 
     return url;
   }
+
+  async share(fileId: string, shareFileDto: ShareFileDto) {
+    const file = await this.findAvailable(fileId);
+
+    if (file.status !== 'UPLOADED') {
+      throw new BadRequestException('File is not available for sharing');
+    }
+
+    // Implement the actual sharing logic here, e.g., sending emails.
+    this.logger.log({ fileId, emails: shareFileDto.emails }, 'File shared');
+    return { success: true };
+  }
 }

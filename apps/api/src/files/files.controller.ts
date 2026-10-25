@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { minutes, Throttle } from '@nestjs/throttler';
 import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
+import { ShareFileDto } from './dto/share-file.dto.js';
 import { FilesService } from './files.service.js';
 
 @Controller('files')
@@ -44,5 +45,13 @@ export class FilesController {
   @Redirect()
   async download(@Param('id', ParseUUIDPipe) fileId: string) {
     return { url: await this.filesService.getDownloadUrl(fileId) };
+  }
+
+  @Post(':id/share')
+  async share(
+    @Param('id', ParseUUIDPipe) fileId: string,
+    @Body() shareFileDto: ShareFileDto,
+  ) {
+    return this.filesService.share(fileId, shareFileDto);
   }
 }

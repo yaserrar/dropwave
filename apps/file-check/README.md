@@ -1,12 +1,18 @@
 # file-check (AWS Lambda)
 
-Runs when a file lands in `s3://dropwave/uploads/`. It reads the first 4 KB, detects
-the real format with [`file-type`](https://github.com/sindresorhus/file-type) and
-compares it with the declared `Content-Type`. It then reports to the API:
+Runs when a file lands in `s3://dropwave/uploads/`. It first checks the real size
+(from the S3 event, so nothing is downloaded), then reads the first 4 KB, detects the
+real format with [`file-type`](https://github.com/sindresorhus/file-type) and compares
+it with the declared `Content-Type`. It then reports to the API:
 
-- **clean:** the content matches, or it's text (which has no signature).
-- **rejected:** the content contradicts the declared type (an `.exe` sent as a PDF), or
-  it's a Windows, Linux or macOS executable.
+- **clean:** the size is within the limit, and the content matches or it's text (which
+  has no signature).
+- **rejected:** the file is empty or over 10 MB, the content contradicts the declared
+  type (an `.exe` sent as a PDF), or it's a Windows, Linux or macOS executable.
+
+The size check matters because a presigned PUT accepts a body of any size: the API only
+validated the size the browser declared. `MAX_FILE_SIZE` in `src/check.ts` must match the
+one in `apps/api/src/lib/consts.ts`.
 
 This checks file types, not viruses. The rules are in [`src/check.ts`](src/check.ts).
 

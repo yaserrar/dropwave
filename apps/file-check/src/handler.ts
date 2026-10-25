@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import type { S3Event } from "aws-lambda";
 import { fileTypeFromBuffer } from "file-type";
-import { checkFileType } from "./check.js";
+import { checkFileSize, checkFileType } from "./check.js";
 
 // file-type needs at most this many bytes to recognise a format.
 const HEAD_BYTES = 4100;
@@ -16,8 +16,9 @@ function requireEnv(name: string): string {
 }
 
 /**
- * Triggered by S3 for every object created under uploads/. Reads the first bytes,
- * decides whether the content matches its declared type, and reports to the API.
+ * Triggered by S3 for every object created under uploads/. Checks the size, then
+ * reads the first bytes to decide whether the content matches its declared type,
+ * and reports to the API.
  * Throwing makes Lambda retry the event (twice, for S3's asynchronous invocation).
  */
 export async function handler(event: S3Event): Promise<void> {
@@ -26,11 +27,20 @@ export async function handler(event: S3Event): Promise<void> {
     // S3 event keys are URL-encoded, with spaces as "+".
     const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
     if (!key.startsWith("uploads/")) continue;
-    await checkObject(bucket, key);
+    await checkObject(bucket, key, record.s3.object.size);
   }
 }
 
-async function checkObject(bucket: string, key: string): Promise<void> {
+async function checkObject(bucket: string, key: string, size: number): Promise<void> {
+  // The event carries the real size, so an oversized file is rejected without reading it.
+  const sizeVerdict = checkFileSize(size);
+  if (!sizeVerdict.ok) {
+    const result = { key, verdict: "rejected", reason: sizeVerdict.reason };
+    console.log(JSON.stringify({ ...result, size }));
+    await report(result);
+    return;
+  }
+
   let head: Uint8Array;
   let declaredType: string | undefined;
   try {
@@ -57,7 +67,8 @@ async function checkObject(bucket: string, key: string): Promise<void> {
     declaredType,
     detectedType: detected?.mime,
   };
-  console.log(JSON.stringify(result));
+  // `size` goes to the log only: the API's DTO accepts exactly the fields in `result`.
+  console.log(JSON.stringify({ ...result, size }));
   await report(result);
 }
 

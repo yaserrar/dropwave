@@ -1,6 +1,6 @@
 import { fileTypeFromBuffer } from "file-type";
 import { describe, expect, it } from "vitest";
-import { checkFileType, normalizeType } from "./check.js";
+import { checkFileSize, checkFileType, MAX_FILE_SIZE, normalizeType } from "./check.js";
 
 // Real file signatures, so the tests go through file-type exactly like the Lambda does.
 const PNG = Uint8Array.from([
@@ -57,6 +57,25 @@ describe("checkFileType", () => {
   it("treats office documents and zip archives as the same family", () => {
     const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     expect(checkFileType(docx, { ext: "zip", mime: "application/zip" })).toEqual({ ok: true });
+  });
+});
+
+describe("checkFileSize", () => {
+  it("accepts files up to the limit", () => {
+    expect(checkFileSize(1)).toEqual({ ok: true });
+    expect(checkFileSize(MAX_FILE_SIZE)).toEqual({ ok: true });
+  });
+
+  it("rejects files over the limit, saying by how much", () => {
+    expect(checkFileSize(MAX_FILE_SIZE + 1).ok).toBe(false);
+    expect(checkFileSize(50 * 1024 * 1024)).toEqual({
+      ok: false,
+      reason: "the file is 50.0 MB, over the 10.0 MB limit",
+    });
+  });
+
+  it("rejects empty files", () => {
+    expect(checkFileSize(0)).toEqual({ ok: false, reason: "the file is empty" });
   });
 });
 
