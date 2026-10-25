@@ -111,7 +111,14 @@ export class FilesService {
   }
 
   async confirmUpload(fileId: string) {
-    const existingFile = await this.findAvailable(fileId);
+    const existingFile = await this.findOne(fileId);
+
+    if (!existingFile) {
+      throw new NotFoundException('File not found');
+    }
+    if (existingFile.status !== 'PENDING') {
+      throw new BadRequestException('File is not in pending state');
+    }
 
     const object = await this.s3Service.getObjectInfo(existingFile.key);
     if (!object) {
@@ -133,7 +140,7 @@ export class FilesService {
     return { fileId };
   }
 
-  async markScanComplete(fileId: string) {
+  async markScanComplete(fileId: string, newStatus: 'UPLOADED' | 'REMOVED') {
     const file = await this.findAvailable(fileId);
 
     if (file.status !== 'SCANNING') {
@@ -142,7 +149,7 @@ export class FilesService {
 
     await this.prisma.file.update({
       where: { id: fileId },
-      data: { status: 'UPLOADED' },
+      data: { status: newStatus },
     });
 
     return { fileId };
@@ -152,6 +159,10 @@ export class FilesService {
   // straight from S3; following a redirect would turn its CORS origin into "null".
   async getPreviewUrl(fileId: string) {
     const file = await this.findAvailable(fileId);
+
+    if (file.status === 'SCANNING') {
+      throw new BadRequestException('File is still being scanned');
+    }
 
     const kind = previewKind(file.contentType);
     if (!kind) {

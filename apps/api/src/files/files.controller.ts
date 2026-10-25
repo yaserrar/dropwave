@@ -8,7 +8,10 @@ import {
   Redirect,
 } from '@nestjs/common';
 import { FilesService } from './files.service.js';
-import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
+import {
+  GenerateUploadUrlDto,
+  MarkScanCompleteDto,
+} from './dto/generate-upload-url.dto.js';
 import { minutes, Throttle } from '@nestjs/throttler';
 
 @Controller('files')
@@ -35,8 +38,14 @@ export class FilesController {
 
   // Scan is finished by Lambda
   @Post(':id/scan-complete')
-  async scanComplete(@Param('id', ParseUUIDPipe) fileId: string) {
-    return this.filesService.markScanComplete(fileId);
+  async scanComplete(
+    @Param('id', ParseUUIDPipe) fileId: string,
+    @Body() markScanCompleteDto: MarkScanCompleteDto,
+  ) {
+    return this.filesService.markScanComplete(
+      fileId,
+      markScanCompleteDto.status,
+    );
   }
 
   // Images, PDFs and text only: a short-lived S3 URL that displays the file instead of downloading it.
