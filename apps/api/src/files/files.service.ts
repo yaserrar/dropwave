@@ -17,6 +17,7 @@ import {
 } from '../lib/consts.js';
 import { previewKind } from '../lib/preview.js';
 import { ScanResultDto } from './dto/scan-result.dto.js';
+import { ShareFileDto } from './dto/share-file.dto.js';
 
 @Injectable()
 export class FilesService {
@@ -289,6 +290,7 @@ export class FilesService {
 
     // Implement the actual sharing logic here, e.g., sending emails.
     this.logger.log({ fileId, emails: shareFileDto.emails }, 'File shared');
+
     return { success: true };
   }
 }
