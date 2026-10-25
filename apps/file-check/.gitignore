@@ -1,0 +1,3 @@
+# esbuild bundle and the zip uploaded to Lambda
+/dist
+/node_modules

@@ -1,0 +1,10 @@
+{
+  "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    // esbuild bundles the code; tsc only type-checks it.
+    "noEmit": true,
+    "lib": ["es2023"],
+    "types": ["node", "aws-lambda"]
+  },
+  "include": ["src"]
+}

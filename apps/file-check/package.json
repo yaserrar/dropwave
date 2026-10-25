@@ -1,0 +1,27 @@
+{
+  "name": "file-check",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "AWS Lambda: checks that each uploaded file's content matches its declared type, then reports to the API.",
+  "scripts": {
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/index.mjs --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "package": "npm run build && cd dist && rm -f function.zip && zip -q function.zip index.mjs",
+    "check-types": "tsc --noEmit",
+    "lint": "oxlint src/",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1155.0",
+    "file-type": "22.1.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/aws-lambda": "8.10.164",
+    "@types/node": "^24.0.0",
+    "esbuild": "0.28.2",
+    "oxlint": "^1.58.0",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.2"
+  }
+}
