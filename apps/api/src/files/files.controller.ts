@@ -47,6 +47,8 @@ export class FilesController {
     return { url: await this.filesService.getDownloadUrl(fileId) };
   }
 
+  // Each call sends real emails from our domain: few calls per IP, at most 25 emails per 10 minutes.
+  @Throttle({ default: { limit: 5, ttl: minutes(10) } })
   @Post(':id/share')
   async share(
     @Param('id', ParseUUIDPipe) fileId: string,

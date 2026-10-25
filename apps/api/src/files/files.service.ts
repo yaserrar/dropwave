@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   GoneException,
   Injectable,
@@ -18,15 +19,25 @@ import {
 import { previewKind } from '../lib/preview.js';
 import { ScanResultDto } from './dto/scan-result.dto.js';
 import { ShareFileDto } from './dto/share-file.dto.js';
+import { ConfigService } from '@nestjs/config';
+import { MailService } from '../mail/mail.service.js';
+import { shareEmail } from '../mail/share-email.js';
 
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
+  private readonly appUrl: string;
 
   constructor(
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
-  ) {}
+    private readonly mailService: MailService,
+    config: ConfigService,
+  ) {
+    // From config, never from the request: a forged Origin header would otherwise put
+    // someone else's link in an email sent from our domain.
+    this.appUrl = config.getOrThrow<string>('APP_URL').replace(/\/+$/, '');
+  }
 
   async findAll() {
     return this.prisma.file.findMany();
@@ -281,6 +292,10 @@ export class FilesService {
     return url;
   }
 
+  /**
+   * Emails the share link, one email per address so recipients don't see each other.
+   * Returns the addresses that failed instead of throwing, unless all of them did.
+   */
   async share(fileId: string, shareFileDto: ShareFileDto) {
     const file = await this.findAvailable(fileId);
 
@@ -288,9 +303,32 @@ export class FilesService {
       throw new BadRequestException('File is not available for sharing');
     }
 
-    // Implement the actual sharing logic here, e.g., sending emails.
-    this.logger.log({ fileId, emails: shareFileDto.emails }, 'File shared');
+    const email = shareEmail(file, `${this.appUrl}/s/${file.id}`);
+    const failed: string[] = [];
+    // One at a time: there are only a few, and the SES sandbox allows 1 email per second.
+    for (const to of shareFileDto.emails) {
+      try {
+        await this.mailService.send(to, email);
+      } catch (error) {
+        failed.push(to);
+        this.logger.warn(
+          { fileId, to, reason: (error as Error).message },
+          'Share email not sent',
+        );
+      }
+    }
 
-    return { success: true };
+    const sent = shareFileDto.emails.length - failed.length;
+    if (sent === 0) {
+      throw new BadGatewayException(
+        "Couldn't send the email. Please try again later.",
+      );
+    }
+    this.logger.log(
+      { fileId, sent, failed: failed.length },
+      'File shared by email',
+    );
+
+    return { sent, failed };
   }
 }
