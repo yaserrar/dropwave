@@ -167,9 +167,14 @@ export class FilesService {
 
   /** Applies the file-check Lambda's verdict. Safe to run twice for the same file. */
   async applyScanResult(result: ScanResultDto) {
-    const file = await this.findOne(result.key);
+    const file = await this.prisma.file.findUnique({
+      where: { key: result.key },
+    });
     // Already cleaned up (e.g. expired): nothing to update, and no reason for Lambda to retry.
-    if (!file) return;
+    if (!file) {
+      this.logger.warn(`Scan result for unknown key ${result.key}; ignoring`);
+      return;
+    }
 
     if (result.verdict === 'rejected') {
       await this.s3Service.deleteObject(file.key);

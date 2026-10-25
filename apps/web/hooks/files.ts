@@ -56,6 +56,8 @@ export const useGetFileInfo = (fileId: string) =>
   useQuery({
     queryKey: qk.files.byId(fileId),
     queryFn: () => filesService.getFileInfo(fileId),
+    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // 5 minutes
     // A 4xx (wrong link, expired) won't change on retry; only retry server/network errors.
     retry: (failureCount, error) => {
       const status = axios.isAxiosError(error)
