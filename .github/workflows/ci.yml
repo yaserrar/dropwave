@@ -1,0 +1,119 @@
+name: CI
+
+# Checks every push to dev, and every pull request into main, before anything
+# can be merged and deployed. deploy.yml takes over once it's on main.
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch or pull request cancels the run it replaces.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # web and file-check. The API is type-checked by its image build below.
+      - name: Type-check
+        run: npm run check-types
+
+      - name: Test the file-check rules
+        run: npm run test -w file-check
+
+  migrations:
+    name: Database migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine # same as the server
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dropwave
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dropwave
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Every migration on an empty database, like the API container does on the server.
+      - name: Apply migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Check schema.prisma has a migration for every change
+        working-directory: apps/api
+        run: |
+          set +e
+          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+          status=$?
+          if [ "$status" = 2 ]; then
+            echo "::error::schema.prisma has changes that no migration makes. Run: npx prisma migrate dev --name <change>"
+          fi
+          exit $status
+
+  build:
+    name: Build ${{ matrix.app }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # The same build as the deploy, without pushing. It compiles the API (failing
+      # on type errors) and builds the Next.js app.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  # The one check to require on main: it passes only if every job above passed,
+  # so the ruleset doesn't need updating when jobs are added or renamed.
+  ci-passed:
+    name: CI passed
+    if: ${{ !cancelled() }}
+    needs: [checks, migrations, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if a job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
