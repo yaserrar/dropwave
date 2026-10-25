@@ -3,16 +3,13 @@ import {
   Controller,
   Get,
   Param,
-  Post,
   ParseUUIDPipe,
+  Post,
   Redirect,
 } from '@nestjs/common';
-import { FilesService } from './files.service.js';
-import {
-  GenerateUploadUrlDto,
-  MarkScanCompleteDto,
-} from './dto/generate-upload-url.dto.js';
 import { minutes, Throttle } from '@nestjs/throttler';
+import { GenerateUploadUrlDto } from './dto/generate-upload-url.dto.js';
+import { FilesService } from './files.service.js';
 
 @Controller('files')
 export class FilesController {
@@ -34,18 +31,6 @@ export class FilesController {
   @Post(':id/confirm')
   async confirmUpload(@Param('id', ParseUUIDPipe) fileId: string) {
     return this.filesService.confirmUpload(fileId);
-  }
-
-  // Scan is finished by Lambda
-  @Post(':id/scan-complete')
-  async scanComplete(
-    @Param('id', ParseUUIDPipe) fileId: string,
-    @Body() markScanCompleteDto: MarkScanCompleteDto,
-  ) {
-    return this.filesService.markScanComplete(
-      fileId,
-      markScanCompleteDto.status,
-    );
   }
 
   // Images, PDFs and text only: a short-lived S3 URL that displays the file instead of downloading it.

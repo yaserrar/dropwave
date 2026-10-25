@@ -5,7 +5,11 @@ import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   // Hold startup logs until pino is ready, so every line uses the same format.
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
+
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix('api');
   app.enableCors();

@@ -16,6 +16,7 @@ import {
   S3_UPLOAD_EXPIRES_IN,
 } from '../lib/consts.js';
 import { previewKind } from '../lib/preview.js';
+import { ScanResultDto } from './dto/scan-result.dto.js';
 
 @Injectable()
 export class FilesService {
@@ -107,7 +108,9 @@ export class FilesService {
   async getFileInfo(fileId: string) {
     const file = await this.findAvailable(fileId);
 
-    return file;
+    const { id, filename, contentType, size, status, expiresAt, createdAt } =
+      file;
+    return { id, filename, contentType, size, status, expiresAt, createdAt };
   }
 
   async confirmUpload(fileId: string) {
@@ -115,6 +118,11 @@ export class FilesService {
 
     if (!existingFile) {
       throw new NotFoundException('File not found');
+    }
+    if (existingFile.status === 'REMOVED') {
+      throw new BadRequestException(
+        existingFile.scanReason ?? 'This file was rejected',
+      );
     }
     if (existingFile.status !== 'PENDING') {
       throw new BadRequestException('File is not in pending state');
@@ -132,27 +140,57 @@ export class FilesService {
       throw new BadRequestException('Uploaded file size does not match');
     }
 
-    await this.prisma.file.update({
-      where: { id: fileId },
+    await this.prisma.file.updateMany({
+      where: { id: fileId, status: 'PENDING' },
       data: { status: 'SCANNING' },
     });
+    // The scan may already have finished while the browser was uploading.
+    await this.promoteIfClean(fileId);
 
-    return { fileId };
+    const { status } = await this.prisma.file.findUniqueOrThrow({
+      where: { id: fileId },
+      select: { status: true },
+    });
+    return { fileId, status };
   }
 
-  async markScanComplete(fileId: string, newStatus: 'UPLOADED' | 'REMOVED') {
-    const file = await this.findAvailable(fileId);
+  /**
+   * SCANNING + a clean verdict → UPLOADED. Both /confirm and the scan result call it,
+   * so whichever of the two arrives last makes the file available.
+   */
+  private async promoteIfClean(fileId: string) {
+    await this.prisma.file.updateMany({
+      where: { id: fileId, status: 'SCANNING', scanVerdict: 'CLEAN' },
+      data: { status: 'UPLOADED' },
+    });
+  }
 
-    if (file.status !== 'SCANNING') {
-      throw new BadRequestException('File is not in scanning state');
+  /** Applies the file-check Lambda's verdict. Safe to run twice for the same file. */
+  async applyScanResult(result: ScanResultDto) {
+    const file = await this.findOne(result.key);
+    // Already cleaned up (e.g. expired): nothing to update, and no reason for Lambda to retry.
+    if (!file) return;
+
+    if (result.verdict === 'rejected') {
+      await this.s3Service.deleteObject(file.key);
+      await this.prisma.file.update({
+        where: { id: file.id },
+        data: {
+          status: 'REMOVED',
+          scanVerdict: 'REJECTED',
+          scanReason: result.reason,
+        },
+      });
+      this.logger.warn(`Removed file ${file.id}: ${result.reason}`);
+      return;
     }
 
-    await this.prisma.file.update({
-      where: { id: fileId },
-      data: { status: newStatus },
+    // Clean: record it even if /confirm hasn't run yet.
+    await this.prisma.file.updateMany({
+      where: { id: file.id, status: { in: ['PENDING', 'SCANNING'] } },
+      data: { scanVerdict: 'CLEAN' },
     });
-
-    return { fileId };
+    await this.promoteIfClean(file.id);
   }
 
   // Returns the URL as JSON (not a redirect) so the browser can fetch text
@@ -162,6 +200,10 @@ export class FilesService {
 
     if (file.status === 'SCANNING') {
       throw new BadRequestException('File is still being scanned');
+    }
+
+    if (file.status !== 'UPLOADED') {
+      throw new BadRequestException('File is still being checked');
     }
 
     const kind = previewKind(file.contentType);

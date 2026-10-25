@@ -32,9 +32,3 @@ export class GenerateUploadUrlDto {
   @Transform(({ value }) => (value ? new Date(value) : value))
   expiresAt?: Date;
 }
-
-export class MarkScanCompleteDto {
-  @IsString()
-  @IsNotEmpty()
-  status: 'UPLOADED' | 'REMOVED';
-}

@@ -21,6 +21,11 @@ enum FileStatus {
   UPLOADED 
 }
 
+enum ScanVerdict {
+  CLEAN
+  REJECTED
+}
+
 model File {
   id            String     @id @default(uuid()) // also the public share id in links
   key           String     @unique // S3 object key
@@ -30,6 +35,11 @@ model File {
   status        FileStatus @default(PENDING)
   downloadCount Int        @default(0)
   expiresAt     DateTime?
+
+  scanVerdict   ScanVerdict? // result of the file scan, if available
+  scanReason    String?   // reason for the scan verdict, if available
+
+
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
