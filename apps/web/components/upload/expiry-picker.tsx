@@ -6,8 +6,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowDown2, Clock, Timer1 } from "iconsax-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TimePicker } from "@/components/ui/time-picker";
 import { MAX_EXPIRY_MS, MIN_EXPIRY_MS } from "@/lib/consts";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -127,14 +127,7 @@ export function ExpiryPicker({ value, onChange }: { value: Date | null; onChange
 
           <div className="flex items-center gap-2 border-t px-3 py-2.5">
             <Clock className="size-4 text-muted-foreground" color="currentColor" />
-            <Input
-              type="time"
-              step={60}
-              value={draftTime}
-              onChange={(e) => setDraftTime(e.target.value)}
-              aria-label="Expiry time"
-              className="h-8 w-28 font-mono"
-            />
+            <TimePicker value={draftTime} onChange={setDraftTime} aria-label="Expiry time" className="h-8 w-20" />
             <span className="truncate text-2xs text-muted-foreground" title={timeZone}>
               {timeZone}
             </span>

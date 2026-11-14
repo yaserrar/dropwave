@@ -5,8 +5,6 @@ name: CI
 on:
   push:
     branches: [dev]
-  pull_request:
-    branches: [main]
 
 # A newer push to the same branch or pull request cancels the run it replaces.
 concurrency:
