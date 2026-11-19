@@ -70,7 +70,7 @@ describe("checkFileSize", () => {
     expect(checkFileSize(MAX_FILE_SIZE + 1).ok).toBe(false);
     expect(checkFileSize(50 * 1024 * 1024)).toEqual({
       ok: false,
-      reason: "the file is 50.0 MB, over the 10.0 MB limit",
+      reason: "the file is 50.0 MB, over the 20.0 MB limit",
     });
   });
 
