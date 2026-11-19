@@ -7,7 +7,7 @@ it with the declared `Content-Type`. It then reports to the API:
 
 - **clean:** the size is within the limit, and the content matches or it's text (which
   has no signature).
-- **rejected:** the file is empty or over 10 MB, the content contradicts the declared
+- **rejected:** the file is empty or over 20 MB, the content contradicts the declared
   type (an `.exe` sent as a PDF), or it's a Windows, Linux or macOS executable.
 
 The size check matters because a presigned PUT accepts a body of any size: the API only

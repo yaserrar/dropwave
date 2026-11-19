@@ -4,7 +4,7 @@ Drop a file, get a private link to share it. No sign-up.
 
 **Live:** [dropwave.asrar.software](https://dropwave.asrar.software)
 
-- Upload files up to 10 MB, with an optional link expiry (5 minutes to 30 days).
+- Upload files up to 20 MB, with an optional link expiry (5 minutes to 30 days).
 - Share page with a preview for images, PDFs and text, and a download button.
 - Email the link to up to 5 people, from the upload page or the share page.
 - Every upload is checked by an AWS Lambda: its real size, and whether its content matches its declared type. Executables are rejected.
@@ -26,7 +26,7 @@ Browser ─(5) POST /api/files/<id>/confirm ─────────▶ API  
 Steps 4 and 5 can arrive in either order. Whichever comes last makes the file available.
 
 1. **Upload URL.** The API validates the name, type and declared size, creates the row, and returns a presigned PUT URL. S3 only accepts the upload with the same `Content-Type`.
-2. **File check.** S3 triggers the [`file-check`](apps/file-check) Lambda. It first checks the object's real size, which comes in the S3 event, because a presigned PUT accepts a body of any size. Then it reads the first 4 KB and detects the real format with [`file-type`](https://github.com/sindresorhus/file-type). Files that are empty, over 10 MB, executables, or whose content contradicts their declared type are rejected. It checks file types; it isn't an antivirus.
+2. **File check.** S3 triggers the [`file-check`](apps/file-check) Lambda. It first checks the object's real size, which comes in the S3 event, because a presigned PUT accepts a body of any size. Then it reads the first 4 KB and detects the real format with [`file-type`](https://github.com/sindresorhus/file-type). Files that are empty, over 20 MB, executables, or whose content contradicts their declared type are rejected. It checks file types; it isn't an antivirus.
 3. **Signed result.** The Lambda reports to the API with an HMAC-SHA256 signature over a timestamp and the raw body. The API compares it in constant time and refuses results older than 5 minutes, so a captured request can't be replayed.
 4. **Confirm.** The browser confirms the upload. The API checks that the size in S3 matches the declared size.
 5. **Outcome.** A clean file becomes `UPLOADED`. A rejected one is deleted from S3 and marked `REMOVED`. Downloads redirect to a short-lived presigned GET URL.
