@@ -4,7 +4,7 @@ export type Detected = { ext: string; mime: string } | undefined;
 export type Verdict = { ok: true } | { ok: false; reason: string };
 
 // Keep in sync with MAX_FILE_SIZE in apps/api/src/lib/consts.ts.
-export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const toMb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 

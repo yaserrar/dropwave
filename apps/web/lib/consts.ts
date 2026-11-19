@@ -1,4 +1,4 @@
-export const MAX_FILE_SIZE = 1024 * 1024 * 10; // 10MB
+export const MAX_FILE_SIZE = 1024 * 1024 * 20; // 20MB
 // Email addresses per share request (keep in sync with apps/api/src/lib/consts.ts).
 export const MAX_SHARE_RECIPIENTS = 5;
 
