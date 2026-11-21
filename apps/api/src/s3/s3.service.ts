@@ -11,6 +11,8 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Readable } from 'node:stream';
+import { contentDisposition } from '../lib/drop-paths.js';
 
 // Credentials come from the default AWS chain: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
 // or ~/.aws locally, and the instance's IAM role on EC2.
@@ -99,6 +101,19 @@ export class S3Service {
     }
   }
 
+  /**
+   * The object's bytes as a stream, read from S3 as the caller consumes it, so a
+   * zip of many files never holds more than a small buffer in memory.
+   */
+  async getObjectStream(key: string): Promise<Readable> {
+    const { Body } = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!Body) throw new Error(`S3 returned no body for ${key}`);
+    // In Node.js the SDK's body is an http.IncomingMessage, a Readable.
+    return Body as Readable;
+  }
+
   async deleteObject(key: string): Promise<void> {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -145,16 +160,4 @@ export class S3Service {
       return false;
     }
   }
-}
-
-// `filename` is the ASCII fallback for old clients; `filename*` carries the real
-// UTF-8 name so names like "résumé.pdf" survive the download.
-function contentDisposition(
-  filename: string,
-  disposition: 'attachment' | 'inline',
-): string {
-  const fallback = filename
-    .replace(/[^\x20-\x7e]/g, '_')
-    .replace(/["\\]/g, '_');
-  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
