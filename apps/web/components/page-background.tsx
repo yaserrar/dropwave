@@ -1,4 +1,9 @@
-/** Grid lines fading out from the top, plus the aurora glow rising behind the main content. */
+/**
+ * Grid lines fading out from the top, plus the aurora glow rising behind the main
+ * content. The glow is wider than a phone, so pages clip it with `overflow-clip`:
+ * `overflow-hidden` would make the page a scroll container that focusing a field
+ * can scroll sideways, with no way back.
+ */
 export function PageBackground() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">

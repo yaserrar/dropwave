@@ -11,6 +11,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 import { MAX_EXPIRY_MS, MIN_EXPIRY_MS } from "@/lib/consts";
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { OptionRow } from "./option-row";
 
 const PRESETS = [
   { label: "1 hour", at: () => addHours(new Date(), 1) },
@@ -74,85 +75,79 @@ export function ExpiryPicker({ value, onChange }: { value: Date | null; onChange
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border bg-card/60 py-2 pr-2 pl-3 backdrop-blur">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-subtle text-brand-muted">
-          <Timer1 variant="Bulk" className="size-4" color="currentColor" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium">Link expiry</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {value ? `Stops working ${formatRelativeTime(value)}` : "Links work until you delete them"}
-          </p>
-        </div>
-      </div>
+    <OptionRow
+      icon={Timer1}
+      title="Link expiry"
+      description={value ? `Stops working ${formatRelativeTime(value)}` : "Links work until you delete them"}
+      active={!!value}
+      control={
+        <Popover open={open} onOpenChange={onOpenChange}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0 gap-1.5 font-normal">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={value ? value.toISOString() : "never"}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.12 }}
+                  className={cn(value && "font-medium text-brand-muted")}
+                >
+                  {value ? format(value, "MMM d, HH:mm") : "Never"}
+                </motion.span>
+              </AnimatePresence>
+              <ArrowDown2 className="size-3.5 text-muted-foreground" color="currentColor" />
+            </Button>
+          </PopoverTrigger>
 
-      <Popover open={open} onOpenChange={onOpenChange}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="shrink-0 gap-1.5 font-normal">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={value ? value.toISOString() : "never"}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.12 }}
-                className={cn(value && "font-medium text-brand-muted")}
-              >
-                {value ? format(value, "MMM d, HH:mm") : "Never"}
-              </motion.span>
-            </AnimatePresence>
-            <ArrowDown2 className="size-3.5 text-muted-foreground" color="currentColor" />
-          </Button>
-        </PopoverTrigger>
+          <PopoverContent align="end" className="w-auto p-0">
+            <div className="grid grid-cols-4 gap-1.5 border-b p-3">
+              {PRESETS.map((preset) => (
+                <Button key={preset.label} variant="secondary" size="xs" onClick={() => apply(preset.at())}>
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
 
-        <PopoverContent align="end" className="w-auto p-0">
-          <div className="grid grid-cols-4 gap-1.5 border-b p-3">
-            {PRESETS.map((preset) => (
-              <Button key={preset.label} variant="secondary" size="xs" onClick={() => apply(preset.at())}>
-                {preset.label}
+            <Calendar
+              mode="single"
+              selected={draftDay}
+              onSelect={setDraftDay}
+              disabled={[{ before: today }, { after: lastDay }]}
+              startMonth={today}
+              endMonth={lastDay}
+              defaultMonth={draftDay}
+            />
+
+            <div className="flex items-center gap-2 border-t px-3 py-2.5">
+              <Clock className="size-4 text-muted-foreground" color="currentColor" />
+              <TimePicker value={draftTime} onChange={setDraftTime} aria-label="Expiry time" className="h-8 w-20" />
+              <span className="truncate text-2xs text-muted-foreground" title={timeZone}>
+                {timeZone}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 border-t p-3">
+              <Button variant="ghost" size="sm" onClick={() => apply(null)}>
+                Never expire
               </Button>
-            ))}
-          </div>
-
-          <Calendar
-            mode="single"
-            selected={draftDay}
-            onSelect={setDraftDay}
-            disabled={[{ before: today }, { after: lastDay }]}
-            startMonth={today}
-            endMonth={lastDay}
-            defaultMonth={draftDay}
-          />
-
-          <div className="flex items-center gap-2 border-t px-3 py-2.5">
-            <Clock className="size-4 text-muted-foreground" color="currentColor" />
-            <TimePicker value={draftTime} onChange={setDraftTime} aria-label="Expiry time" className="h-8 w-20" />
-            <span className="truncate text-2xs text-muted-foreground" title={timeZone}>
-              {timeZone}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 border-t p-3">
-            <Button variant="ghost" size="sm" onClick={() => apply(null)}>
-              Never expire
-            </Button>
-            <Button
-              size="sm"
-              disabled={!!error}
-              onClick={() => candidate && apply(candidate)}
-              className="bg-brand text-brand-foreground hover:bg-brand-hover"
-            >
-              Set expiry
-            </Button>
-          </div>
-          {error && draftDay && (
-            <p role="alert" className="-mt-1 px-3 pb-3 text-right text-xs text-danger-muted">
-              {error}
-            </p>
-          )}
-        </PopoverContent>
-      </Popover>
-    </div>
+              <Button
+                size="sm"
+                disabled={!!error}
+                onClick={() => candidate && apply(candidate)}
+                className="bg-brand text-brand-foreground hover:bg-brand-hover"
+              >
+                Set expiry
+              </Button>
+            </div>
+            {error && draftDay && (
+              <p role="alert" className="-mt-1 px-3 pb-3 text-right text-xs text-danger-muted">
+                {error}
+              </p>
+            )}
+          </PopoverContent>
+        </Popover>
+      }
+    />
   );
 }
