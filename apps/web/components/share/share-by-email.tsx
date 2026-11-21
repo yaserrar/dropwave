@@ -5,9 +5,9 @@ import { Send2 } from "iconsax-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useShareFile } from "@/hooks/files";
+import { useShareDrop } from "@/hooks/drops";
 import { MAX_SHARE_RECIPIENTS } from "@/lib/consts";
-import { shareSchema } from "@/schemas/files";
+import { shareSchema } from "@/schemas/drops";
 import { cn } from "@/lib/utils";
 
 /** "a@x.com, b@y.com c@z.com" → the unique addresses, or what's wrong with the list. */
@@ -32,18 +32,21 @@ function parseEmails(value: string): { emails: string[] } | { error: string } {
 }
 
 export function ShareByEmail({
-  fileId,
+  dropId,
+  protected: isProtected = false,
   onSent,
   size = "default",
 }: {
-  fileId: string;
+  dropId: string;
+  /** The email then names nothing, and the password is never in it. */
+  protected?: boolean;
   onSent: () => void;
   /** "lg" matches the share page's 44px buttons. */
   size?: "default" | "lg";
 }) {
   const [value, setValue] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
-  const { mutate: share, isPending } = useShareFile();
+  const { mutate: share, isPending } = useShareDrop();
   const inputId = React.useId();
   const hintId = `${inputId}-hint`;
 
@@ -56,11 +59,11 @@ export function ShareByEmail({
     }
 
     share(
-      { fileId, emails: parsed.emails },
+      { dropId, emails: parsed.emails },
       {
         onSuccess: ({ sent, failed }) => {
           toast.success(sent === 1 ? "Email sent" : `Sent to ${sent} people`, {
-            description: "They'll get a link to this file.",
+            description: isProtected ? "They'll get the link. Send them the password yourself." : "They'll get a link to the files.",
           });
           if (failed.length > 0) {
             toast.warning(`Couldn't send to ${failed.join(", ")}`, {
@@ -114,7 +117,8 @@ export function ShareByEmail({
         aria-live="polite"
         className={cn("px-0.5 text-xs", error ? "text-danger-muted" : "text-muted-foreground")}
       >
-        {error ?? `Up to ${MAX_SHARE_RECIPIENTS} addresses, separated by commas. Each gets a link to this file.`}
+        {error ??
+          `Up to ${MAX_SHARE_RECIPIENTS} addresses, separated by commas. ${isProtected ? "Each gets the link, never the password." : "Each gets the link."}`}
       </p>
     </form>
   );
