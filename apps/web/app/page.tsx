@@ -5,7 +5,7 @@ import { Uploader } from "@/components/upload/uploader";
 
 export default function Home() {
   return (
-    <div className="relative isolate flex min-h-dvh flex-col overflow-hidden">
+    <div className="relative isolate flex min-h-dvh flex-col overflow-clip">
       <PageBackground />
       <SiteHeader />
 
@@ -19,8 +19,8 @@ export default function Home() {
             <span className="text-dia pr-[0.04em]">anywhere.</span>
           </h1>
           <p className="animate-fade-up mt-5 max-w-md text-base leading-relaxed text-pretty text-muted-foreground [animation-delay:160ms]">
-            Upload a file and get a private link you can send to anyone. No
-            account, no app to install.
+            Upload a file, a few, or a whole folder and get one private link
+            you can send to anyone. No account, no app to install.
           </p>
         </div>
 

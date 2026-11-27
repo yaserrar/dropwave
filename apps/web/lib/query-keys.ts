@@ -1,6 +1,6 @@
 export const qk = {
-  files: {
-    all: ["files"],
-    byId: (id: string) => ["files", id],
+  drops: {
+    all: ["drops"],
+    byId: (id: string) => ["drops", id],
   },
 };

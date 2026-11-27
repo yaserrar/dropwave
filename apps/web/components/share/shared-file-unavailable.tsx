@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Danger, DocumentUpload, Refresh2, SearchStatus, Timer1, type Icon } from "iconsax-react";
+import { Danger, DocumentUpload, Refresh2, SearchStatus, Timer1, Trash, type Icon } from "iconsax-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type UnavailableReason = "not-found" | "expired" | "error";
+export type UnavailableReason = "not-found" | "expired" | "consumed" | "error";
 
 const COPY: Record<UnavailableReason, { icon: Icon; tone: string; title: string; body: string }> = {
   "not-found": {
@@ -20,6 +20,12 @@ const COPY: Record<UnavailableReason, { icon: Icon; tone: string; title: string;
     tone: "bg-warning-subtle text-warning-muted",
     title: "This link has expired",
     body: "Shared files are only kept for a limited time. Ask the sender to upload it again.",
+  },
+  consumed: {
+    icon: Trash,
+    tone: "bg-muted text-muted-foreground",
+    title: "Already downloaded",
+    body: "This link worked for one download only. The files were downloaded and then deleted. Ask the sender to share them again.",
   },
   error: {
     icon: Danger,

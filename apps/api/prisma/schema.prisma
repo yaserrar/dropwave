@@ -26,24 +26,58 @@ enum ScanVerdict {
   REJECTED
 }
 
+// How a burn-after-download drop was used up: one file's download URL, or "Download all".
+enum DownloadKind {
+  FILE
+  ZIP
+}
+
+// What one link shares: a single file, several files, or a folder. Expiry, password
+// and "delete after the first download" apply to the whole drop.
+model Drop {
+  id                String    @id @default(uuid()) // the public share id in links (/s/<id>)
+  expiresAt         DateTime?
+  passwordHash      String? // scrypt hash; null when the link has no password
+  burnAfterDownload Boolean   @default(false)
+  consumedAt        DateTime? // set by the one download that wins on a burn-after-download drop
+  // FILE: the files are purged once the download URL expires. ZIP: the zip purges
+  // them itself when it ends, however long it streams (see TasksService).
+  consumedBy        DownloadKind?
+  downloadCount     Int       @default(0) // "Download all" (zip) downloads; files count their own
+
+  // Wrong-password attempts in the current window, to stop guessing (see DropsService.unlock).
+  unlockFailures    Int       @default(0)
+  unlockWindowStart DateTime?
+
+  files File[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt]) // find expired drops to delete
+  @@index([consumedAt]) // find downloaded burn-after-download drops to purge
+  @@map("drops")
+}
+
 model File {
-  id            String     @id @default(uuid()) // also the public share id in links
+  id            String     @id @default(uuid())
+  dropId        String
+  drop          Drop       @relation(fields: [dropId], references: [id], onDelete: Cascade)
   key           String     @unique // S3 object key
+  path          String // relative path inside the drop ("photos/a.jpg"); the name alone for loose files
   filename      String // original name, used for Content-Disposition on download
   contentType   String
-  size          Int // bytes; BigInt so files over 2 GB fit
+  size          Int // bytes
   status        FileStatus @default(PENDING)
   downloadCount Int        @default(0)
-  expiresAt     DateTime?
 
   scanVerdict   ScanVerdict? // result of the file scan, if available
   scanReason    String?   // reason for the scan verdict, if available
 
-
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  @@unique([dropId, path])
   @@index([status, createdAt]) // find stale PENDING uploads to clean up
-  @@index([expiresAt]) // find expired files to delete
   @@map("files")
 }

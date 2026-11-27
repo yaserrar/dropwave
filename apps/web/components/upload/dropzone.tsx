@@ -2,24 +2,41 @@
 
 import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { DocumentUpload } from "iconsax-react";
+import { DocumentUpload, Folder2 } from "iconsax-react";
+import { Button } from "@/components/ui/button";
 import { formatBytes } from "@/lib/format";
-import { MAX_FILE_SIZE } from "@/lib/consts";
+import { MAX_DROP_SIZE, MAX_FILE_SIZE, MAX_FILES_PER_DROP } from "@/lib/consts";
+import {
+  filesFromInput,
+  readDataTransfer,
+  walkEntries,
+  type PickedFile,
+} from "@/lib/drop-files";
 import { cn } from "@/lib/utils";
 
 const hasFiles = (e: DragEvent) =>
   e.dataTransfer?.types.includes("Files") ?? false;
 
 /**
- * Drop target for the whole page: files dropped (or pasted) anywhere are
- * accepted, and the zone lights up as soon as a file is dragged into the
- * window. Clicking or pressing Enter/Space opens the file picker.
+ * Drop target for the whole page: files and folders dropped (or pasted)
+ * anywhere are accepted, and the zone lights up as soon as a file is dragged
+ * into the window. Clicking or pressing Enter/Space opens the file picker; a
+ * second button picks a whole folder.
+ *
+ * Everything dropped or picked at once goes to `onFiles` together, to share one
+ * link. `tooMany` is set when a dropped folder held more than MAX_FILES_PER_DROP
+ * files: the walk stops there instead of reading the rest.
  */
-export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
+export function Dropzone({
+  onFiles,
+}: {
+  onFiles: (files: PickedFile[], tooMany: boolean) => void;
+}) {
   const [dragging, setDragging] = React.useState(false);
   const [burst, setBurst] = React.useState(0);
   const zoneRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const folderInputRef = React.useRef<HTMLInputElement>(null);
   const hintId = React.useId();
 
   // Window listeners are attached once; read the latest callback through a ref.
@@ -28,10 +45,10 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
     onFilesRef.current = onFiles;
   }, [onFiles]);
 
-  const accept = React.useCallback((files: File[]) => {
-    if (!files.length) return;
-    setBurst((n) => n + 1);
-    onFilesRef.current(files);
+  // Empty results go through too: an empty folder deserves a word, not silence.
+  const accept = React.useCallback((files: PickedFile[], tooMany = false) => {
+    if (files.length) setBurst((n) => n + 1);
+    onFilesRef.current(files, tooMany);
   }, []);
 
   React.useEffect(() => {
@@ -56,11 +73,23 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      accept(Array.from(e.dataTransfer?.files ?? []));
+      if (!e.dataTransfer) return;
+      // Read now: the browser empties the DataTransfer once this handler returns.
+      const { entries, files } = readDataTransfer(e.dataTransfer);
+      if (entries.length === 0) {
+        accept(files.map((file) => ({ file, path: file.name })));
+        return;
+      }
+      walkEntries(entries, MAX_FILES_PER_DROP).then(
+        ({ files: walked, tooMany }) => accept(walked, tooMany),
+        // A folder the browser won't let us read: fall back to the loose files.
+        () => accept(files.map((file) => ({ file, path: file.name }))),
+      );
     };
     const onPaste = (e: ClipboardEvent) => {
       const files = Array.from(e.clipboardData?.files ?? []);
-      if (files.length) accept(files);
+      if (files.length)
+        accept(files.map((file) => ({ file, path: file.name })));
     };
 
     window.addEventListener("dragenter", onEnter);
@@ -131,7 +160,7 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
           type="button"
           onClick={() => inputRef.current?.click()}
           aria-describedby={hintId}
-          className="relative z-10 flex w-full flex-col items-center gap-5 px-6 py-14 text-center outline-none sm:py-20"
+          className="relative z-10 flex w-full flex-col items-center gap-5 px-6 pt-14 pb-4 text-center outline-none sm:pt-20 sm:pb-5"
         >
           <IconTile dragging={dragging} burst={burst} />
 
@@ -175,12 +204,15 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
             id={hintId}
             className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
           >
-            <span>Any file type</span>
+            <span>Up to {MAX_FILES_PER_DROP} files per link</span>
             <span
               aria-hidden
               className="size-1 rounded-full bg-border-strong"
             />
-            <span>Up to {formatBytes(MAX_FILE_SIZE, 0)} each</span>
+            <span>
+              {formatBytes(MAX_FILE_SIZE, 0)} each,{" "}
+              {formatBytes(MAX_DROP_SIZE, 0)} in all
+            </span>
             <span
               aria-hidden
               className="size-1 rounded-full bg-border-strong max-sm:hidden"
@@ -194,6 +226,19 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
           </p>
         </button>
 
+        <div className="relative z-10 flex justify-center px-6 pb-12 sm:pb-16">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => folderInputRef.current?.click()}
+          >
+            <Folder2 variant="Bulk" className="size-3.5" color="currentColor" />
+            Choose a folder
+          </Button>
+        </div>
+
         <input
           ref={inputRef}
           type="file"
@@ -201,7 +246,22 @@ export function Dropzone({ onFiles }: { onFiles: (files: File[]) => void }) {
           tabIndex={-1}
           className="sr-only"
           onChange={(e) => {
-            accept(Array.from(e.target.files ?? []));
+            if (e.target.files) accept(filesFromInput(e.target.files));
+            e.target.value = "";
+          }}
+        />
+        <input
+          // webkitdirectory isn't in React's types; set it on the element.
+          ref={(input) => {
+            folderInputRef.current = input;
+            input?.setAttribute("webkitdirectory", "");
+          }}
+          type="file"
+          tabIndex={-1}
+          aria-hidden
+          className="sr-only"
+          onChange={(e) => {
+            if (e.target.files) accept(filesFromInput(e.target.files));
             e.target.value = "";
           }}
         />

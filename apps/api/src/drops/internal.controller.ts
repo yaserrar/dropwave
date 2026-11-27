@@ -1,13 +1,13 @@
 import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ScanResultDto } from './dto/scan-result.dto.js';
-import { FilesService } from './files.service.js';
+import { UploadsService } from './uploads.service.js';
 import { ScanSignatureGuard } from './scan-signature.guard.js';
 
 /** Routes for our own infrastructure, never the browser. */
 @Controller('internal')
 export class InternalController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(private readonly uploadsService: UploadsService) {}
 
   // Called by the file-check Lambda; ScanSignatureGuard checks its signature.
   @Post('scan-result')
@@ -15,6 +15,6 @@ export class InternalController {
   @SkipThrottle()
   @UseGuards(ScanSignatureGuard)
   async scanResult(@Body() result: ScanResultDto) {
-    await this.filesService.applyScanResult(result);
+    await this.uploadsService.applyScanResult(result);
   }
 }

@@ -8,7 +8,7 @@ import {
 
 import { MAX_SHARE_RECIPIENTS } from '../../lib/consts.js';
 
-export class ShareFileDto {
+export class ShareDropDto {
   // Every address gets an email from our domain, so the list is capped (and the
   // route is throttled) to keep Dropwave from being used to send spam.
   @IsArray()

@@ -1,364 +1,122 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion } from "motion/react";
-import {
-  Copy,
-  CopySuccess,
-  ImportCurve,
-  ShieldTick,
-  Sms,
-  TickCircle,
-  Timer1,
-} from "iconsax-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { motion } from "motion/react";
 import { iconForFile } from "@/lib/file-icons";
 import { fileTypeLabel, formatBytes, formatRelativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import type { FileInfo, FileStatus } from "@/types/file";
+import dropsService from "@/services/drops";
+import type { DropFile, OpenDrop } from "@/types/drop";
 import { FilePreviewDialog } from "./file-preview-dialog";
-import { ShareByEmail } from "./share-by-email";
+import {
+  BurnNotice,
+  CopyLinkButton,
+  DownloadButton,
+  EmailShare,
+  IconTile,
+  LinkFacts,
+  PrivacyFooter,
+  ShareCardFrame,
+  rise,
+  stagger,
+} from "./share-actions";
 
-const DAY_MS = 24 * 3600 * 1000;
-
-const stagger = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
-};
-const rise = {
-  hidden: { opacity: 0, y: 10 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const },
-  },
-};
-
+/** The share page for a link with one file. */
 export function SharedFileCard({
+  drop,
   file,
-  downloadUrl,
+  beforeBurn,
 }: {
-  file: FileInfo;
-  downloadUrl: string;
+  drop: OpenDrop;
+  file: DropFile;
+  /** Checks a burn-after-download link still works before its one download. */
+  beforeBurn: () => Promise<boolean>;
 }) {
   const FileIcon = iconForFile(file.filename, file.contentType);
-  const expiresSoon = file.expiresAt
-    ? new Date(file.expiresAt).getTime() - Date.now() < DAY_MS
-    : false;
-  // The API only emails files that passed the check, like it only serves them.
-  const canEmail = file.status === "UPLOADED";
-  const [emailOpen, setEmailOpen] = React.useState(false);
+  const ready = file.status === "UPLOADED";
+  const downloadUrl = dropsService.fileDownloadUrl(drop.id, file.id);
+  // Set once this browser started the one download of a burn-after-download link.
+  const [used, setUsed] = React.useState(false);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97, y: 12 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 260, damping: 26 }}
-      className="frame-double"
-    >
-      <div className="relative isolate overflow-hidden rounded-[13px] border bg-card">
-        <div
-          aria-hidden
-          className="bg-dot-grid pointer-events-none absolute inset-x-0 top-0 h-48 opacity-70 mask-[radial-gradient(ellipse_70%_100%_at_50%_0%,black,transparent_80%)]"
-        />
+    <ShareCardFrame>
+      <motion.div
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+        className="relative flex flex-col items-center px-6 pt-10 pb-6 text-center sm:px-10"
+      >
+        <motion.div variants={rise}>
+          <IconTile icon={FileIcon} />
+        </motion.div>
+        {ready ? (
+          <motion.span
+            variants={rise}
+            className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-brand-subtle px-2.5 py-0.5 text-xs font-medium text-brand-muted"
+          >
+            Shared with you
+          </motion.span>
+        ) : (
+          <motion.span
+            variants={rise}
+            className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-warning-subtle px-2.5 py-0.5 text-xs font-medium text-warning-muted"
+          >
+            File is being scanned
+          </motion.span>
+        )}
 
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          className="relative flex flex-col items-center px-6 pt-10 pb-6 text-center sm:px-10"
+        <motion.h1
+          variants={rise}
+          title={file.filename}
+          className="mt-3 line-clamp-2 font-heading text-2xl leading-tight font-medium tracking-tight wrap-break-word sm:text-[28px]"
         >
-          <motion.div variants={rise}>
-            <FileTile icon={FileIcon} />
-          </motion.div>
-          {file.status == "UPLOADED" ? (
-            <motion.span
-              variants={rise}
-              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-brand-subtle px-2.5 py-0.5 text-xs font-medium text-brand-muted"
-            >
-              Shared with you
-            </motion.span>
-          ) : (
-            <motion.span
-              variants={rise}
-              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-amber-500/25 px-2.5 py-0.5 text-xs font-medium text-amber-600"
-            >
-              File is being scanned
-            </motion.span>
-          )}
+          {file.filename}
+        </motion.h1>
 
-          <motion.h1
-            variants={rise}
-            title={file.filename}
-            className="mt-3 line-clamp-2 font-heading text-2xl leading-tight font-medium tracking-tight wrap-break-word sm:text-[28px]"
-          >
-            {file.filename}
-          </motion.h1>
+        <motion.p
+          variants={rise}
+          className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+        >
+          <span className="rounded-sm border bg-muted px-1.5 py-px font-mono text-2xs font-medium text-foreground">
+            {fileTypeLabel(file.filename, file.contentType)}
+          </span>
+          <span className="font-mono tabular-nums">{formatBytes(file.size)}</span>
+          <span aria-hidden className="size-1 rounded-full bg-border-strong" />
+          <span>Uploaded {formatRelativeTime(drop.createdAt)}</span>
+        </motion.p>
 
-          <motion.p
-            variants={rise}
-            className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
-          >
-            <span className="rounded-sm border bg-muted px-1.5 py-px font-mono text-2xs font-medium text-foreground">
-              {fileTypeLabel(file.filename, file.contentType)}
-            </span>
-            <span className="font-mono tabular-nums">
-              {formatBytes(file.size)}
-            </span>
-            <span
-              aria-hidden
-              className="size-1 rounded-full bg-border-strong"
-            />
-            <span>Uploaded {formatRelativeTime(file.createdAt)}</span>
-          </motion.p>
+        <LinkFacts expiresAt={drop.expiresAt} isProtected={drop.protected} burnAfterDownload={drop.burnAfterDownload} />
 
-          {file.expiresAt && (
-            <motion.p
-              variants={rise}
-              className={cn(
-                "mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs",
-                expiresSoon
-                  ? "bg-warning-subtle text-warning-muted"
-                  : "text-muted-foreground",
-              )}
-            >
-              <Timer1 className="size-3.5" color="currentColor" />
-              Link expires {formatRelativeTime(file.expiresAt)}
-            </motion.p>
-          )}
-
-          <motion.div variants={rise} className="mt-8 flex w-full gap-2">
-            <DownloadButton href={downloadUrl} status={file.status} />
-            <FilePreviewDialog file={file} downloadUrl={downloadUrl} />
-            <CopyLinkButton />
-          </motion.div>
-
-          <motion.div variants={rise} className="mt-3">
-            <EmailToggle
-              open={emailOpen}
-              disabled={!canEmail}
-              onToggle={() => setEmailOpen((open) => !open)}
-            />
-          </motion.div>
-
-          <AnimatePresence initial={false}>
-            {emailOpen && canEmail && (
-              <motion.div
-                key="email"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                // The padding, offset by the negative margin, leaves room for the input's focus ring.
-                className="-mx-1 -mb-1 self-stretch overflow-hidden px-1 pb-1"
-              >
-                <ShareByEmail
-                  fileId={file.id}
-                  size="lg"
-                  onSent={() => setEmailOpen(false)}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <motion.div variants={rise} className="mt-8 flex w-full gap-2">
+          <DownloadButton
+            href={downloadUrl}
+            label="Download file"
+            ready={ready}
+            used={used}
+            beforeDownload={
+              drop.burnAfterDownload
+                ? async () => {
+                    const ok = await beforeBurn();
+                    if (ok) setUsed(true);
+                    return ok;
+                  }
+                : undefined
+            }
+          />
+          {!drop.burnAfterDownload && <FilePreviewDialog dropId={drop.id} file={file} downloadUrl={downloadUrl} />}
+          <CopyLinkButton />
         </motion.div>
 
-        <div className="relative flex items-center justify-center gap-1.5 border-t bg-surface/60 px-6 py-3 text-xs text-muted-foreground">
-          <ShieldTick
-            className="size-3.5 shrink-0 text-success-muted"
-            color="currentColor"
-          />
-          Stored privately · only people with this link can download it
-        </div>
-      </div>
-    </motion.div>
-  );
-}
+        {drop.burnAfterDownload && <BurnNotice used={used} many={false} />}
 
-/** File icon on a raised tile, with slow waves rolling out behind it. */
-function FileTile({
-  icon: FileIcon,
-}: {
-  icon: ReturnType<typeof iconForFile>;
-}) {
-  return (
-    <div className="relative">
-      {[0, 1].map((i) => (
-        <motion.span
-          key={i}
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-3xl border border-brand/40"
-          animate={{ scale: [1, 1.9], opacity: [0.5, 0] }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            delay: i * 1.5,
-            ease: "easeOut",
-          }}
-        />
-      ))}
-      <div
-        aria-hidden
-        className="absolute inset-2 rounded-full bg-brand/30 blur-xl"
-      />
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
-        className="relative flex size-20 items-center justify-center rounded-3xl border bg-card text-brand-muted shadow-lg"
-      >
-        <FileIcon variant="Bulk" className="size-10" color="currentColor" />
+        {!used && <EmailShare dropId={drop.id} isProtected={drop.protected} disabled={!ready} />}
       </motion.div>
-    </div>
+
+      <PrivacyFooter>Stored privately · only people with this link can download it</PrivacyFooter>
+    </ShareCardFrame>
   );
 }
 
-function DownloadButton({
-  href,
-  status,
-}: {
-  href: string;
-  status: FileStatus;
-}) {
-  const [started, setStarted] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!started) return;
-    const timer = setTimeout(() => setStarted(false), 2500);
-    return () => clearTimeout(timer);
-  }, [started]);
-
-  return (
-    <Button
-      asChild
-      size="lg"
-      className={cn(
-        "group/download h-11 flex-1 rounded-lg bg-brand text-sm text-brand-foreground shadow-md hover:bg-brand-hover",
-
-        status !== "UPLOADED" && "cursor-not-allowed opacity-50",
-      )}
-      disabled={status !== "UPLOADED"}
-    >
-      {/* The API redirects to a short-lived S3 URL that is served as an attachment. */}
-      <a
-        href={status == "UPLOADED" ? href : undefined}
-        onClick={() => (status == "UPLOADED" ? setStarted(true) : undefined)}
-        role={status == "UPLOADED" ? "link" : undefined}
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={started ? "started" : "idle"}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
-            className="inline-flex items-center gap-2"
-          >
-            {started ? (
-              <>
-                <TickCircle
-                  variant="Bold"
-                  className="size-4.5"
-                  color="currentColor"
-                />
-                Download started
-              </>
-            ) : (
-              <>
-                <ImportCurve
-                  className="size-4.5 transition-transform duration-300 group-hover/download:translate-y-0.5"
-                  color="currentColor"
-                />
-                Download file
-              </>
-            )}
-          </motion.span>
-        </AnimatePresence>
-      </a>
-    </Button>
-  );
-}
-
-function CopyLinkButton() {
-  const [copied, setCopied] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1800);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      toast.success("Link copied");
-    } catch {
-      toast.error("Couldn't copy the link", {
-        description: "Copy it from the address bar instead.",
-      });
-    }
-  };
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-lg"
-          className="size-11 rounded-lg"
-          aria-label="Copy link"
-          onClick={copy}
-        >
-          {copied ? (
-            <CopySuccess
-              className="size-4.5 text-success"
-              color="currentColor"
-            />
-          ) : (
-            <Copy className="size-4.5" color="currentColor" />
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{copied ? "Copied" : "Copy link"}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-// A text button under the actions rather than a fourth icon beside them: that row
-// has no room left on a phone, and downloading stays the main action.
-function EmailToggle({
-  open,
-  disabled,
-  onToggle,
-}: {
-  open: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className={cn(!open && "text-muted-foreground")}
-      aria-expanded={open}
-      disabled={disabled}
-      onClick={onToggle}
-    >
-      <Sms className="size-3.5" color="currentColor" />
-      Send to someone by email
-    </Button>
-  );
-}
-
-export function SharedFileSkeleton() {
+export function SharedDropSkeleton() {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -366,7 +124,7 @@ export function SharedFileSkeleton() {
       exit={{ opacity: 0 }}
       className="frame-double"
       aria-busy
-      aria-label="Loading file"
+      aria-label="Loading"
     >
       <div className="flex flex-col items-center rounded-[13px] border bg-card px-6 pt-10 pb-6 sm:px-10">
         <div className="size-20 animate-pulse rounded-3xl bg-muted" />

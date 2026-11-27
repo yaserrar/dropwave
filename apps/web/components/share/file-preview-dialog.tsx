@@ -13,27 +13,34 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useGetPreview, useGetPreviewText } from "@/hooks/files";
+import { useGetPreview, useGetPreviewText } from "@/hooks/drops";
 import { iconForFile } from "@/lib/file-icons";
 import { fileTypeLabel, formatBytes } from "@/lib/format";
 import { previewKind, type PreviewKind } from "@/lib/preview";
 import { cn } from "@/lib/utils";
-import type { FileInfo } from "@/types/file";
+import type { DropFile } from "@/types/drop";
 
 // Big text files would make the page sluggish; show the start and offer the download.
 const MAX_TEXT_CHARS = 100_000;
 
-/** "Preview" button + dialog. Renders nothing for types the browser can't show. */
+/**
+ * "Preview" button + dialog. Renders nothing for types the browser can't show.
+ * `compact` is the icon-only button of a row in a file list.
+ */
 export function FilePreviewDialog({
+  dropId,
   file,
   downloadUrl,
+  compact = false,
 }: {
-  file: FileInfo;
+  dropId: string;
+  file: DropFile;
   downloadUrl: string;
+  compact?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const kind = previewKind(file.contentType);
-  const preview = useGetPreview(file.id, open && kind !== null);
+  const preview = useGetPreview(dropId, file.id, open && kind !== null);
   const FileIcon = iconForFile(file.filename, file.contentType);
 
   if (!kind) return null;
@@ -41,19 +48,31 @@ export function FilePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          disabled={file.status !== "UPLOADED"}
-          variant="outline"
-          size="lg"
-          className={cn(
-            "h-11 rounded-lg px-3.5",
-            file.status !== "UPLOADED" && "cursor-not-allowed opacity-50",
-          )}
-          aria-label="Preview file"
-        >
-          <Eye className="size-4.5" color="currentColor" />
-          <span className="max-sm:hidden">Preview</span>
-        </Button>
+        {compact ? (
+          <Button
+            disabled={file.status !== "UPLOADED"}
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
+            aria-label={`Preview ${file.filename}`}
+          >
+            <Eye variant="Bulk" className="size-4" color="currentColor" />
+          </Button>
+        ) : (
+          <Button
+            disabled={file.status !== "UPLOADED"}
+            variant="outline"
+            size="lg"
+            className={cn(
+              "h-11 rounded-lg px-3.5",
+              file.status !== "UPLOADED" && "cursor-not-allowed opacity-50",
+            )}
+            aria-label="Preview file"
+          >
+            <Eye className="size-4.5" color="currentColor" />
+            <span className="max-sm:hidden">Preview</span>
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
